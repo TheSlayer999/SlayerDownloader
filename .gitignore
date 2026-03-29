@@ -23,6 +23,9 @@ env/
 *.swp
 *.swo
 
+# Config (gerado automaticamente)
+config.json
+
 # OS files
 Thumbs.db
 .DS_Store

@@ -825,7 +825,10 @@ if __name__ == "__main__":
 
     # Ícone (ignora se não existir)
     try:
-        root.iconbitmap("icon.ico")
+        base = os.path.dirname(os.path.abspath(__file__))
+        icon_path = os.path.join(base, "assets", "icon.ico")
+        if os.path.exists(icon_path):
+            root.iconbitmap(icon_path)
     except Exception:
         pass
 

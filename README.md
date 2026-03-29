@@ -1,61 +1,40 @@
 # 🗡️ SlayerDownloader
 
-Um downloader de vídeos e áudio moderno, com interface gráfica escura e elegante.
+Descarrega vídeos e músicas de YouTube, TikTok, Instagram e mais — com um clique.
 
-![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)
-![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=flat-square&logo=windows&logoColor=white)
-![License](https://img.shields.io/badge/License-Private-red?style=flat-square)
+## Como usar
 
-## ✨ Funcionalidades
+### Executável (.exe)
+1. Corre o `build.bat`
+2. Abre `dist/SlayerDownloader.exe`
+3. Cola o link, escolhe o formato e carrega em **Descarregar**
 
-- 🎵 **Download de Áudio** — MP3 a 320kbps (qualidade máxima)
-- 🎬 **Download de Vídeo** — MP4 em 720p, 1080p ou melhor qualidade
-- 📋 **Fila de Downloads** — Adiciona vários links e descarrega tudo de uma vez
-- 🔍 **Deteção Automática** — Reconhece YouTube, Twitter/X, Instagram, TikTok, Vimeo e SoundCloud
-- 💾 **Preferências Guardadas** — Lembra a pasta de destino e o formato preferido
-- ❌ **Cancelamento** — Cancela downloads em progresso a qualquer momento
-
-## 🖥️ Interface
-
-Interface escura moderna com paleta de azuis vibrantes, tipografia Calibri e design limpo.
-
-## 📦 Requisitos
-
-- **Python 3.10+**
-- **yt-dlp** — `pip install yt-dlp`
-- **FFmpeg** — Necessário para juntar vídeo+áudio e converter para MP3
-  - Descarregar em [ffmpeg.org](https://ffmpeg.org/download.html)
-  - Colocar `ffmpeg.exe` na mesma pasta do script ou adicionar ao PATH
-
-## 🚀 Como Usar
-
-### Executar como script Python
+### Script Python
 ```bash
 pip install yt-dlp
 python downloader.py
 ```
 
-### Compilar para .exe
-```bash
-build.bat
-```
-O executável será criado na pasta `dist/`.
+## Formatos disponíveis
 
-## 📁 Estrutura
+| Formato | Descrição |
+|---------|-----------|
+| 🎵 MP3  | Só áudio, qualidade máxima (320kbps) |
+| 🎬 720p | Vídeo MP4 em HD |
+| 🎬 1080p | Vídeo MP4 em Full HD |
+| ⭐ Melhor | Vídeo MP4 na melhor qualidade possível |
+
+## Requisitos
+
+- **Python 3.10+** (só para correr o script)
+- **FFmpeg** — copiado automaticamente pelo `build.bat`
+
+## Estrutura
 
 ```
 SlayerDownloader/
-├── downloader.py      # Aplicação principal
-├── config.json        # Preferências do utilizador (gerado automaticamente)  
-├── icon.ico           # Ícone da aplicação
-├── build.bat          # Script para compilar o .exe
-├── ffmpeg.exe         # FFmpeg (não incluído no repo - ver requisitos)
-└── .gitignore
+├── downloader.py      # App principal
+├── build.bat          # Compila para .exe + copia FFmpeg
+└── assets/
+    └── icon.ico       # Ícone da aplicação
 ```
-
-## 🛠️ Tecnologias
-
-- **Tkinter** — Interface gráfica nativa do Python
-- **yt-dlp** — Motor de download de vídeos
-- **FFmpeg** — Processamento e conversão de media
-- **PyInstaller** — Compilação para executável Windows
