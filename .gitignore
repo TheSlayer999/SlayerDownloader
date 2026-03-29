@@ -1,0 +1,38 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+build/
+dist/
+*.spec
+*.egg-info/
+
+# PyInstaller
+*.manifest
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# FFmpeg binaries (too large for git)
+ffmpeg.exe
+ffplay.exe
+ffprobe.exe
+
+# Temporary files
+*.tmp
+*.log
