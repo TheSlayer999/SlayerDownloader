@@ -518,15 +518,15 @@ class PulsarUI:
         btn_frame.pack(fill="x")
 
         self.dl_btn = tk.Button(btn_frame,
-                                text="⬇  Descarregar",
-                                font=("Calibri", 14, "bold"),
+                                text="▼  DESCARREGAR",
+                                font=("Segoe UI", 16, "bold"),
                                 bg=C["accent"], fg="#ffffff",
                                 activebackground=C["accent2"],
                                 activeforeground="#ffffff",
                                 relief="flat", bd=0,
                                 cursor="hand2",
                                 command=self._start_download,
-                                padx=20, pady=12)
+                                padx=24, pady=16)
         self.dl_btn.pack(fill="x")
 
         # hover
@@ -777,7 +777,7 @@ class PulsarUI:
         self.engine.start(jobs, self.download_path.get())
 
     def _on_all_done(self, cancelled=False):
-        self.dl_btn.config(state="normal", text="⬇  Descarregar", bg=C["accent"])
+        self.dl_btn.config(state="normal", text="▼  DESCARREGAR", bg=C["accent"])
 
         if cancelled:
             self._set_status("Download cancelado.", C["warn"])
