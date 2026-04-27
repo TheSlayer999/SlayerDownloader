@@ -34,7 +34,6 @@ if exist "ffmpeg.exe" (
     for /d %%D in (ffmpeg-temp\ffmpeg-*) do (
         if exist "%%D\bin\ffmpeg.exe" (
             copy /Y "%%D\bin\ffmpeg.exe" "ffmpeg.exe" >nul
-            copy /Y "%%D\bin\ffprobe.exe" "ffprobe.exe" >nul
             echo    FFmpeg extraido com sucesso!
         )
     )
