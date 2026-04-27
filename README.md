@@ -2,20 +2,22 @@
 
 Descarrega vídeos e músicas de YouTube, TikTok, Instagram e mais — com um clique.
 
-## Como usar
+---
 
-### Executável (.exe)
-1. Corre o `build.bat`
-2. Abre `dist/SlayerDownloader.exe`
-3. Cola o link, escolhe o formato e carrega em **Descarregar**
+## ⬇️ Download Rápido
 
-### Script Python
-```bash
-pip install yt-dlp
-python downloader.py
-```
+**Só queres usar o programa?** Descarrega o ficheiro pronto:
 
-## Formatos disponíveis
+### 📦 [Descarregar SlayerDownloader.rar](SlayerDownloader.rar)
+
+> Extrai o `.rar`, abre o `SlayerDownloader.exe` e está pronto a usar!
+
+⚠️ O Windows pode bloquear o `.exe` por não estar assinado digitalmente.  
+Nesse caso, clica em **"Mais informações" → "Executar mesmo assim"**.
+
+---
+
+## 🎯 Formatos disponíveis
 
 | Formato | Descrição |
 |---------|-----------|
@@ -24,17 +26,31 @@ python downloader.py
 | 🎬 1080p | Vídeo MP4 em Full HD |
 | ⭐ Melhor | Vídeo MP4 na melhor qualidade possível |
 
-## Requisitos
+---
 
-- **Python 3.10+** (só para correr o script)
+## 🛠️ Para programadores
+
+### Correr o script Python
+```bash
+pip install yt-dlp
+python downloader.py
+```
+
+### Compilar para .exe
+```bash
+build.bat
+```
+
+### Requisitos
+- **Python 3.10+**
 - **FFmpeg** — copiado automaticamente pelo `build.bat`
 
-## Estrutura
-
+### Estrutura
 ```
 SlayerDownloader/
 ├── downloader.py      # App principal
 ├── build.bat          # Compila para .exe + copia FFmpeg
-└── assets/
-    └── icon.ico       # Ícone da aplicação
+├── assets/
+│   └── icon.ico       # Ícone da aplicação
+└── SlayerDownloader.rar  # Programa pronto a usar
 ```
