@@ -40,17 +40,18 @@ python downloader.py
 ```bash
 build.bat
 ```
+> O `build.bat` descarrega o FFmpeg automaticamente se não o encontrar na pasta.
 
 ### Requisitos
 - **Python 3.10+**
-- **FFmpeg** — copiado automaticamente pelo `build.bat`
+- **FFmpeg** — descarregado automaticamente pelo `build.bat`
 
 ### Estrutura
 ```
 SlayerDownloader/
-├── downloader.py      # App principal
-├── build.bat          # Compila para .exe + copia FFmpeg
+├── downloader.py         # App principal
+├── build.bat             # Compila para .exe + descarrega FFmpeg
 ├── assets/
-│   └── icon.ico       # Ícone da aplicação
+│   └── icon.ico          # Ícone da aplicação
 └── SlayerDownloader.rar  # Programa pronto a usar
 ```
