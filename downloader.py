@@ -97,9 +97,6 @@ FORMAT_OPTIONS = {
 # Caminho do ficheiro de configuração (junto ao script)
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
 
-# Máximo de itens no histórico
-MAX_HISTORY = 15
-
 
 # ─────────────────────────────────────────────
 #  CONFIG MANAGER — Persistência de preferências
@@ -111,13 +108,11 @@ class ConfigManager:
         "download_path": os.path.expanduser("~/Downloads"),
         "format": list(FORMAT_OPTIONS.keys())[0],
         "show_log": True,
-        "history": [],
     }
 
     def __init__(self, path=CONFIG_PATH):
         self._path = path
         self._data = dict(self.DEFAULTS)
-        self._data["history"] = list(self.DEFAULTS["history"])
         self._load()
 
     def _load(self):
@@ -143,22 +138,6 @@ class ConfigManager:
 
     def set(self, key, value):
         self._data[key] = value
-
-    def add_history(self, url, fmt_label):
-        """Adiciona um URL ao histórico de downloads."""
-        entry = {
-            "url": url,
-            "format": fmt_label,
-            "date": datetime.now().strftime("%d/%m %H:%M"),
-        }
-        # Remover duplicado se existir
-        self._data["history"] = [
-            h for h in self._data["history"] if h["url"] != url
-        ]
-        self._data["history"].insert(0, entry)
-        # Limitar tamanho
-        self._data["history"] = self._data["history"][:MAX_HISTORY]
-        self.save()
 
 
 # ─────────────────────────────────────────────
@@ -409,8 +388,8 @@ class PulsarUI:
     def __init__(self, root):
         self.root = root
         self.root.title("SlayerDownloader")
-        self.root.geometry("760x700")
-        self.root.minsize(680, 600)
+        self.root.geometry("800x800")
+        self.root.minsize(800, 800)
         self.root.configure(bg=C["bg"])
 
         # Managers
@@ -484,7 +463,7 @@ class PulsarUI:
                  fg=C["accent"], bg=C["bg"]).pack(side="left")
         tk.Label(header, text="DOWNLOADER", font=("Calibri", 22),
                  fg=C["text_dim"], bg=C["bg"]).pack(side="left", padx=(6, 0))
-        tk.Label(header, text="v2.0", font=F_SMALL,
+        tk.Label(header, text="v2.0.1", font=F_SMALL,
                  fg=C["text_muted"], bg=C["bg"]).pack(side="left", padx=(10, 0), pady=(8, 0))
 
         # Botão atualizar yt-dlp (direita do header)
@@ -498,6 +477,10 @@ class PulsarUI:
         self.update_btn.pack(side="right")
 
         self._sep()
+
+        # ── PAINEL INFERIOR (Garante que o botão não encolhe) ──
+        bottom_panel = tk.Frame(self.root, bg=C["bg"])
+        bottom_panel.pack(side="bottom", fill="both", expand=True)
 
         # ── PAINEL PRINCIPAL ──
         main = tk.Frame(self.root, bg=C["bg"], padx=28)
@@ -532,24 +515,25 @@ class PulsarUI:
         self.thumb_container = tk.Frame(main, bg=C["bg"])
         self.thumb_container.pack(fill="x")
         
-        # — Thumbnail preview —
+        # — Thumbnail preview (Sempre visível para evitar saltos no layout) —
         self.thumb_frame = tk.Frame(self.thumb_container, bg=C["surface"], bd=0,
                                     highlightthickness=1,
                                     highlightbackground=C["border"])
-        # Inicialmente escondido
-        self.thumb_img_label = tk.Label(self.thumb_frame, bg=C["surface"])
+        self.thumb_frame.pack(fill="x", pady=(8, 0))
+
+        self.thumb_img_label = tk.Label(self.thumb_frame, bg=C["surface"], width=17, height=4) # Tamanho fixo placeholder
         self.thumb_img_label.pack(side="left", padx=(8, 10), pady=8)
 
         self.thumb_info_frame = tk.Frame(self.thumb_frame, bg=C["surface"])
         self.thumb_info_frame.pack(side="left", fill="both", expand=True, pady=8, padx=(0, 8))
 
-        self.thumb_title_label = tk.Label(self.thumb_info_frame, text="",
-                                          font=F_BOLD, fg=C["text"], bg=C["surface"],
+        self.thumb_title_label = tk.Label(self.thumb_info_frame, text="A aguardar link...",
+                                          font=F_BOLD, fg=C["text_dim"], bg=C["surface"],
                                           wraplength=450, justify="left", anchor="nw")
         self.thumb_title_label.pack(fill="x", anchor="w")
 
-        self.thumb_channel_label = tk.Label(self.thumb_info_frame, text="",
-                                             font=F_SMALL, fg=C["text_dim"], bg=C["surface"],
+        self.thumb_channel_label = tk.Label(self.thumb_info_frame, text="Insere um URL para ver os detalhes",
+                                             font=F_SMALL, fg=C["text_muted"], bg=C["surface"],
                                              anchor="w")
         self.thumb_channel_label.pack(fill="x", anchor="w", pady=(2, 0))
 
@@ -557,9 +541,6 @@ class PulsarUI:
                                               font=F_SMALL, fg=C["text_muted"], bg=C["surface"],
                                               anchor="w")
         self.thumb_duration_label.pack(fill="x", anchor="w")
-
-        # — Histórico —
-        self._build_history_section(main)
 
         # — Formato —
         self._label(main, "Formato")
@@ -637,8 +618,8 @@ class PulsarUI:
         clear_btn.bind("<Button-1>", lambda e: self._clear_queue())
 
         # — Barra de progresso —
-        self._sep(pady=12)
-        prog_frame = tk.Frame(self.root, bg=C["bg"], padx=28)
+        self._sep(pady=12, parent=bottom_panel)
+        prog_frame = tk.Frame(bottom_panel, bg=C["bg"], padx=28)
         prog_frame.pack(fill="x")
 
         self.prog_bar = ttk.Progressbar(prog_frame, variable=self.progress_var,
@@ -665,7 +646,7 @@ class PulsarUI:
         # Escondido inicialmente — aparece depois do download
 
         # — Botão principal (DESCARREGAR / CANCELAR) —
-        btn_frame = tk.Frame(self.root, bg=C["bg"], padx=28, pady=16)
+        btn_frame = tk.Frame(bottom_panel, bg=C["bg"], padx=28, pady=16)
         btn_frame.pack(fill="x")
 
         self.dl_btn = tk.Button(btn_frame,
@@ -677,7 +658,7 @@ class PulsarUI:
                                 relief="flat", bd=0,
                                 cursor="hand2",
                                 command=self._start_download,
-                                padx=24, pady=16)
+                                padx=24, pady=12)
         self.dl_btn.pack(fill="x")
 
         # hover
@@ -688,9 +669,9 @@ class PulsarUI:
         self.show_log_var = tk.BooleanVar(value=bool(self.config.get("show_log")))
 
         # — Log de histórico —
-        self._sep(pady=4)
+        self._sep(pady=4, parent=bottom_panel)
 
-        self.log_container = tk.Frame(self.root, bg=C["bg"])
+        self.log_container = tk.Frame(bottom_panel, bg=C["bg"])
         self.log_container.pack(fill="both", expand=True, side="bottom")
 
         # Cabeçalho do log (sempre visível)
@@ -719,45 +700,6 @@ class PulsarUI:
         # Aplicar estado inicial do log
         if self.show_log_var.get():
             self.log_frame.pack(fill="both", expand=True, pady=(0, 12))
-
-    def _build_history_section(self, parent):
-        """Constrói a secção de histórico se houver itens."""
-        history = self.config.get("history")
-        if not history:
-            self.hist_frame = None
-            return
-
-        self.hist_frame = tk.Frame(parent, bg=C["bg"])
-
-        hist_header = tk.Frame(self.hist_frame, bg=C["bg"])
-        hist_header.pack(fill="x")
-
-        self._label(hist_header, "Histórico")
-
-        clear_hist = tk.Label(hist_header, text="limpar",
-                              font=F_SMALL,
-                              fg=C["text_muted"], bg=C["bg"],
-                              cursor="hand2")
-        clear_hist.pack(side="right", pady=(12, 0))
-        clear_hist.bind("<Button-1>", lambda e: self._clear_history())
-
-        hist_row = tk.Frame(self.hist_frame, bg=C["bg"])
-        hist_row.pack(fill="x", pady=(4, 0))
-
-        hist_values = []
-        for h in history:
-            url_short = h['url'][:55] + "..." if len(h['url']) > 55 else h['url']
-            hist_values.append(f"{h['date']}  ·  {url_short}")
-
-        self.hist_var = tk.StringVar(value="")
-        self.hist_menu = ttk.Combobox(hist_row, textvariable=self.hist_var,
-                                      values=hist_values,
-                                      state="readonly", style="Pulsar.TCombobox",
-                                      font=F_SMALL, takefocus=0)
-        self.hist_menu.pack(side="left", fill="x", expand=True)
-        self.hist_menu.bind("<<ComboboxSelected>>", self._on_history_select)
-
-        self.hist_frame.pack(fill="x")
 
     def _style_ttk(self):
         s = ttk.Style()
@@ -817,8 +759,9 @@ class PulsarUI:
                       command=cmd, padx=14, pady=8)
         return b
 
-    def _sep(self, pady=8):
-        f = tk.Frame(self.root, bg=C["border"], height=1)
+    def _sep(self, pady=8, parent=None):
+        parent = parent or self.root
+        f = tk.Frame(parent, bg=C["border"], height=1)
         f.pack(fill="x", padx=28, pady=pady)
 
     # ── HOVER DO BOTÃO ──────────────────────
@@ -987,48 +930,24 @@ class PulsarUI:
 
     def _show_thumbnail(self, title, channel, duration, thumb_img):
         """Mostra a secção de thumbnail com info do vídeo."""
-        self.thumb_title_label.config(text=title)
-        self.thumb_channel_label.config(text=channel)
+        self.thumb_title_label.config(text=title, fg=C["text"])
+        self.thumb_channel_label.config(text=channel, fg=C["text_dim"])
         self.thumb_duration_label.config(text=f"⏱ {duration}" if duration else "")
 
         if thumb_img:
             self._thumbnail_image = thumb_img
-            self.thumb_img_label.config(image=thumb_img)
+            self.thumb_img_label.config(image=thumb_img, width=0, height=0) # Reset placeholder size
         else:
-            self.thumb_img_label.config(image="")
-
-        self.thumb_frame.pack(fill="x", pady=(8, 0))
+            self.thumb_img_label.config(image="", width=17, height=4)
 
     def _hide_thumbnail(self):
-        """Esconde a secção de thumbnail."""
-        if hasattr(self, 'thumb_frame'):
-            self.thumb_frame.pack_forget()
+        """Esconde a info do vídeo e mostra o placeholder."""
+        if hasattr(self, 'thumb_title_label'):
+            self.thumb_title_label.config(text="A aguardar link...", fg=C["text_dim"])
+            self.thumb_channel_label.config(text="Insere um URL para ver os detalhes", fg=C["text_muted"])
+            self.thumb_duration_label.config(text="")
+            self.thumb_img_label.config(image="", width=17, height=4)
         self._thumbnail_image = None
-
-    # ── HISTÓRICO ───────────────────────────
-    def _on_history_select(self, event):
-        """Quando um item do histórico é selecionado, preencher URL e formato."""
-        idx = self.hist_menu.current()
-        history = self.config.get("history")
-        if 0 <= idx < len(history):
-            item = history[idx]
-            self.url_var.set(item["url"])
-            # Restaurar formato se ainda existir
-            if item.get("format") in FORMAT_OPTIONS:
-                self.format_var.set(item["format"])
-            self._log(f"Histórico: {item['url'][:50]}...", "info")
-        # Limpar seleção
-        self.root.after(50, lambda: self.hist_var.set(""))
-
-    def _clear_history(self):
-        """Limpa todo o histórico."""
-        self.config.set("history", [])
-        self.config.save()
-        if self.hist_frame:
-            self.hist_frame.pack_forget()
-            self.hist_frame.destroy()
-            self.hist_frame = None
-        self._log("Histórico limpo.", "info")
 
     # ── ABRIR PASTA ─────────────────────────
     def _open_download_folder(self):
@@ -1249,10 +1168,6 @@ class PulsarUI:
             jobs = [{"url": url, "format": self.format_var.get()}]
         else:
             jobs = self.queue.items()
-
-        # Guardar no histórico
-        for job in jobs:
-            self.config.add_history(job["url"], job["format"])
 
         # Esconder botão "Abrir pasta"
         self.open_folder_btn.pack_forget()
