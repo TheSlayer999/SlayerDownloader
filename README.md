@@ -17,6 +17,16 @@ Nesse caso, clica em **"Mais informações" → "Executar mesmo assim"**.
 
 ---
 
+## ✨ Funcionalidades
+
+- 📋 **Colar automático** — cola o URL do clipboard ao abrir a app
+- 🖼️ **Preview** — mostra miniatura e título do vídeo antes de descarregar
+- 📂 **Abrir pasta** — acesso rápido à pasta de destino após download
+- 🕐 **Histórico** — acesso rápido aos últimos downloads
+- 🔄 **Atualizar yt-dlp** — mantém a app funcional com um clique
+- 🔔 **Notificação sonora** — avisa quando o download termina
+- ⚡ **Fila de downloads** — adiciona vários links e descarrega de uma vez
+
 ## 🎯 Formatos disponíveis
 
 | Formato | Descrição |
@@ -32,7 +42,7 @@ Nesse caso, clica em **"Mais informações" → "Executar mesmo assim"**.
 
 ### Correr o script Python
 ```bash
-pip install yt-dlp
+pip install yt-dlp Pillow
 python downloader.py
 ```
 
@@ -40,16 +50,18 @@ python downloader.py
 ```bash
 build.bat
 ```
-> O `build.bat` descarrega o FFmpeg automaticamente se não o encontrar na pasta.
+> O `build.bat` descarrega o FFmpeg automaticamente e cria a pasta `SlayerDownloader/` com tudo pronto.
 
 ### Requisitos
 - **Python 3.10+**
+- **yt-dlp** — motor de download
+- **Pillow** — para mostrar thumbnails
 - **FFmpeg** — descarregado automaticamente pelo `build.bat`
 
 ### Estrutura
 ```
 SlayerDownloader/
-├── downloader.py         # App principal
+├── downloader.py         # App principal (UI + lógica)
 ├── build.bat             # Compila para .exe + descarrega FFmpeg
 ├── assets/
 │   └── icon.ico          # Ícone da aplicação

@@ -5,7 +5,7 @@ echo ===================================================
 echo.
 
 echo 1. Instalando dependencias...
-python -m pip install pypiwin32 pyinstaller
+python -m pip install pypiwin32 pyinstaller Pillow
 
 echo.
 echo 2. A verificar FFmpeg...
@@ -30,7 +30,7 @@ if exist "ffmpeg.exe" (
     echo    A extrair FFmpeg...
     powershell -Command "Expand-Archive -Path 'ffmpeg-download.zip' -DestinationPath 'ffmpeg-temp' -Force"
     
-    REM Copiar os executaveis da subpasta bin para a raiz
+    REM Copiar o executavel da subpasta bin para a raiz
     for /d %%D in (ffmpeg-temp\ffmpeg-*) do (
         if exist "%%D\bin\ffmpeg.exe" (
             copy /Y "%%D\bin\ffmpeg.exe" "ffmpeg.exe" >nul
@@ -55,14 +55,20 @@ echo 3. A compilar o downloader.py num EXE (isso pode demorar uns minutos)...
 python -m PyInstaller --noconfirm --onefile --windowed --name "SlayerDownloader" --icon "assets\icon.ico" --add-data "assets;assets" "downloader.py"
 
 echo.
-echo 4. A copiar FFmpeg para a pasta dist...
-copy /Y "ffmpeg.exe" "dist\ffmpeg.exe" >nul
-echo    FFmpeg copiado para dist\
+echo 4. A criar pasta final "SlayerDownloader"...
+if exist "SlayerDownloader" rd /S /Q "SlayerDownloader"
+mkdir "SlayerDownloader"
+copy /Y "dist\SlayerDownloader.exe" "SlayerDownloader\SlayerDownloader.exe" >nul
+copy /Y "ffmpeg.exe" "SlayerDownloader\ffmpeg.exe" >nul
 
 echo.
 echo ===================================================
 echo CONCLUIDO! 
-echo O teu EXE esta agora disponivel dentro da pasta "dist\"
-echo Basta abrir o SlayerDownloader.exe e usar!
+echo.
+echo A pasta "SlayerDownloader\" contem tudo pronto:
+echo   - SlayerDownloader.exe
+echo   - ffmpeg.exe
+echo.
+echo Podes comprimir esta pasta num .rar para distribuir!
 echo ===================================================
 pause
