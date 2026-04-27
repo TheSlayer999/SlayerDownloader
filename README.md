@@ -6,11 +6,11 @@ Descarrega vídeos e músicas de YouTube, TikTok, Instagram e mais — com um cl
 
 ## ⬇️ Download Rápido
 
-**Só queres usar o programa?** Descarrega o ficheiro pronto:
+**Só queres usar o programa?** Descarrega o ficheiro pronto a usar a partir da secção de **Releases**:
 
-### 📦 [Descarregar SlayerDownloader.rar](SlayerDownloader.rar)
-
-> Extrai o `.rar`, abre o `SlayerDownloader.exe` e está pronto a usar!
+1. Vai ao separador [Releases](../../releases) aqui no GitHub (do lado direito).
+2. Descarrega o ficheiro `SlayerDownloader.rar` da versão mais recente.
+3. Extrai o `.rar`, abre o `SlayerDownloader.exe` e está pronto a usar!
 
 ⚠️ O Windows pode bloquear o `.exe` por não estar assinado digitalmente.  
 Nesse caso, clica em **"Mais informações" → "Executar mesmo assim"**.
@@ -63,7 +63,6 @@ build.bat
 SlayerDownloader/
 ├── downloader.py         # App principal (UI + lógica)
 ├── build.bat             # Compila para .exe + descarrega FFmpeg
-├── assets/
-│   └── icon.ico          # Ícone da aplicação
-└── SlayerDownloader.rar  # Programa pronto a usar
+└── assets/
+    └── icon.ico          # Ícone da aplicação
 ```
