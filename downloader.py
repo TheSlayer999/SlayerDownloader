@@ -1,15 +1,9 @@
 """
-╔══════════════════════════════════════╗
-║        SLAYER  DOWNLOADER          ║
-║   YouTube · MP3 · MP4 · Expansível   ║
-╚══════════════════════════════════════╝
+Slayer Downloader
 
-Dependências (instalar uma vez):
-    pip install yt-dlp Pillow
-
-Opcional (para conversão de áudio):
-    Instalar ffmpeg: https://ffmpeg.org/download.html
-    (No Windows: adicionar ao PATH)
+Interface gráfica (Tkinter) para download de vídeos e áudios de plataformas
+como YouTube, TikTok, Twitter e Instagram. Suporta downloads individuais
+e em fila, com conversão automática via FFmpeg.
 """
 
 import tkinter as tk
@@ -24,14 +18,14 @@ import shutil
 import time
 from datetime import datetime
 
-# Sons do Windows
+# Suporte a notificações sonoras nativas do Windows
 try:
     import winsound
     WINSOUND_AVAILABLE = True
 except ImportError:
     WINSOUND_AVAILABLE = False
 
-# Thumbnails (Pillow)
+# Suporte a pré-visualização de miniaturas (Pillow)
 try:
     from PIL import Image, ImageTk
     import urllib.request
@@ -40,9 +34,7 @@ try:
 except ImportError:
     PIL_AVAILABLE = False
 
-# ─────────────────────────────────────────────
-#  TENTAR IMPORTAR YT-DLP
-# ─────────────────────────────────────────────
+# Importação dinâmica da biblioteca yt-dlp
 try:
     import yt_dlp
     YT_DLP_AVAILABLE = True
@@ -50,33 +42,31 @@ except ImportError:
     YT_DLP_AVAILABLE = False
 
 
-# ─────────────────────────────────────────────
-#  PALETA DE CORES E ESTILOS
-# ─────────────────────────────────────────────
+# Configuração da paleta de cores e estilos visuais
 C = {
-    "bg":        "#0c1222",   # Azul escuro profundo
-    "surface":   "#131d33",   # Azul marinho subtil
-    "surface2":  "#1a2744",   # Azul para painéis
-    "border":    "#263758",   # Borda azul suave
-    "accent":    "#3b82f6",   # Azul vibrante (principal)
-    "accent2":   "#2563eb",   # Azul mais escuro (hover)
-    "text":      "#f0f4ff",   # Branco suave azulado
-    "text_dim":  "#94a3c8",   # Cinza azulado claro
-    "text_muted":"#566b90",   # Cinza azulado
-    "success":   "#34d399",   # Verde suave
-    "warn":      "#fbbf24",   # Amarelo quente
-    "error":     "#f87171",   # Vermelho suave
-    "entry_bg":  "#0e1629",   # Fundo de inputs
+    "bg":        "#0c1222",   # Cor de fundo principal (azul escuro)
+    "surface":   "#131d33",   # Superfície primária (azul marinho)
+    "surface2":  "#1a2744",   # Superfície secundária (painéis e botões)
+    "border":    "#263758",   # Bordas e divisores
+    "accent":    "#3b82f6",   # Destaque principal (azul vibrante)
+    "accent2":   "#2563eb",   # Destaque secundário (hover do botão)
+    "text":      "#f0f4ff",   # Texto principal
+    "text_dim":  "#94a3c8",   # Texto secundário ou descritivo
+    "text_muted": "#566b90",  # Texto desativado ou auxiliar
+    "success":   "#34d399",   # Indicador de sucesso (verde)
+    "warn":      "#fbbf24",   # Indicador de aviso ou atenção (amarelo)
+    "error":     "#f87171",   # Indicador de erro ou falha (vermelho)
+    "entry_bg":  "#0e1629",   # Fundo dos campos de entrada de texto
 }
 
-# Configurações de Fontes
+# Configurações de tipografia
 F_MAIN = ("Calibri", 12)
 F_BOLD = ("Calibri", 10, "bold")
 F_TITLE = ("Calibri", 24, "bold")
 F_SMALL = ("Calibri", 9)
 F_MONO = ("Consolas", 10)
 
-# Plataformas suportadas (expansível — basta adicionar aqui)
+# Plataformas oficialmente suportadas e seus padrões de detecção
 PLATFORMS = {
     "YouTube":  {"pattern": r"youtube\.com|youtu\.be",  "icon": "▶"},
     "Twitter":  {"pattern": r"twitter\.com|x\.com",     "icon": "✕"},
@@ -86,7 +76,7 @@ PLATFORMS = {
     "SoundCloud":{"pattern":r"soundcloud\.com",          "icon": "☁"},
 }
 
-# Formatos disponíveis — simples e direto
+# Opções de formato e qualidade de download
 FORMAT_OPTIONS = {
     "🎵  Só Áudio (MP3)":          {"type": "audio", "ext": "mp3",  "quality": "320"},
     "🎬  Vídeo 720p":              {"type": "video", "ext": "mp4",  "quality": "720"},
@@ -94,15 +84,13 @@ FORMAT_OPTIONS = {
     "⭐  Vídeo Melhor Qualidade":  {"type": "video", "ext": "mp4",  "quality": "best"},
 }
 
-# Caminho do ficheiro de configuração (junto ao script)
+# Caminho para o arquivo de configuração local do usuário
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
 
 
-# ─────────────────────────────────────────────
-#  CONFIG MANAGER — Persistência de preferências
-# ─────────────────────────────────────────────
+# --- Gerenciador de Configurações ---
 class ConfigManager:
-    """Lê e guarda preferências do utilizador num ficheiro JSON."""
+    """Gere a leitura, escrita e persistência das configurações locais do usuário."""
 
     DEFAULTS = {
         "download_path": os.path.expanduser("~/Downloads"),
@@ -119,19 +107,19 @@ class ConfigManager:
         try:
             with open(self._path, "r", encoding="utf-8") as f:
                 saved = json.load(f)
-            # Só aceitar chaves conhecidas
+            # Carrega apenas chaves de configuração suportadas
             for key in self.DEFAULTS:
                 if key in saved:
                     self._data[key] = saved[key]
         except (FileNotFoundError, json.JSONDecodeError):
-            pass  # usa defaults
+            pass  # Utiliza os valores padrões
 
     def save(self):
         try:
             with open(self._path, "w", encoding="utf-8") as f:
                 json.dump(self._data, f, indent=2, ensure_ascii=False)
         except OSError:
-            pass  # falha silenciosa (permissões, disco cheio, etc.)
+            pass  # Ignora erros de permissão ou falta de espaço em disco ao salvar
 
     def get(self, key):
         return self._data.get(key, self.DEFAULTS.get(key))
@@ -140,11 +128,9 @@ class ConfigManager:
         self._data[key] = value
 
 
-# ─────────────────────────────────────────────
-#  QUEUE MANAGER — Gestão de fila de downloads
-# ─────────────────────────────────────────────
+# --- Gerenciador da Fila de Downloads ---
 class QueueManager:
-    """Gere a fila de URLs pendentes para download."""
+    """Controla a lista de links adicionados para processamento em lote."""
 
     def __init__(self):
         self._items = []
@@ -169,13 +155,11 @@ class QueueManager:
         return bool(self._items)
 
 
-# ─────────────────────────────────────────────
-#  DOWNLOAD ENGINE — Lógica de download via subprocess
-# ─────────────────────────────────────────────
+# --- Motor de Download (yt-dlp) ---
 class DownloadEngine:
-    """Executa downloads em subprocessos separados, com suporte fiável a cancelamento."""
+    """Controla a execução do yt-dlp em um subprocesso em segundo plano."""
 
-    # Padrões de erros de rede conhecidos
+    # Padrões de erro mapeados para diagnósticos mais amigáveis
     NETWORK_ERRORS = {
         "unable to download webpage": "Sem ligação à internet ou URL inválido",
         "urlopen error": "Sem ligação à internet",
@@ -204,7 +188,7 @@ class DownloadEngine:
         self._last_activity_time = 0
 
     def start(self, jobs, dest):
-        """Lança os downloads numa thread daemon."""
+        """Inicia os downloads da fila em uma thread dedicada (daemon)."""
         self.cancel_requested = False
         self.is_downloading = True
         self._last_activity_time = time.time()
@@ -214,7 +198,7 @@ class DownloadEngine:
         thread.start()
 
     def cancel(self):
-        """Cancela imediatamente o subprocesso de download."""
+        """Interrompe e finaliza a execução ativa do subprocesso do yt-dlp."""
         self.cancel_requested = True
         if self._process:
             try:
@@ -246,12 +230,16 @@ class DownloadEngine:
         self._on_status(f"[{idx}/{total}] A ligar...", C["text_dim"])
         self._last_activity_time = time.time()
 
-        # Identificar o executável de forma segura para PyInstaller
-        python_exe = sys.executable
-        if getattr(sys, 'frozen', False):
-            cmd = [python_exe, "--run-yt-dlp", "--no-warnings", "--socket-timeout", "15", "--newline"]
+        # Determina o caminho do executável do yt-dlp conforme o ambiente
+        app_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+        local_ytdlp = os.path.join(app_dir, "yt-dlp.exe")
+
+        if os.path.exists(local_ytdlp):
+            cmd = [local_ytdlp, "--no-warnings", "--socket-timeout", "15", "--newline"]
+        elif getattr(sys, 'frozen', False):
+            cmd = [sys.executable, "--run-yt-dlp", "--no-warnings", "--socket-timeout", "15", "--newline"]
         else:
-            cmd = [python_exe, "-m", "yt_dlp", "--no-warnings", "--socket-timeout", "15", "--newline"]
+            cmd = [sys.executable, "-m", "yt_dlp", "--no-warnings", "--socket-timeout", "15", "--newline"]
 
         out_template = os.path.join(dest, "%(title)s.%(ext)s")
         cmd.extend(["-o", out_template])
@@ -287,8 +275,13 @@ class DownloadEngine:
         cmd.append(url)
 
         try:
-            # Esconde janela de consola preta no windows
+            # Oculta a janela do console/terminal no ambiente Windows
             creationflags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+
+            # Inclui o diretório local no PATH para que o yt-dlp localize o FFmpeg
+            app_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+            env = os.environ.copy()
+            env["PATH"] = app_dir + os.pathsep + env.get("PATH", "")
 
             self._process = subprocess.Popen(
                 cmd,
@@ -297,7 +290,8 @@ class DownloadEngine:
                 text=True,
                 encoding='utf-8',
                 errors='replace',
-                creationflags=creationflags
+                creationflags=creationflags,
+                env=env
             )
 
             for line in iter(self._process.stdout.readline, ''):
@@ -335,7 +329,7 @@ class DownloadEngine:
             self._process = None
 
     def _check_network_errors(self, line):
-        """Verifica padrões de erros de rede conhecidos na saída do yt-dlp."""
+        """Analisa a saída de texto do yt-dlp em busca de mensagens de erro conhecidas."""
         line_lower = line.lower()
         for pattern, message in self.NETWORK_ERRORS.items():
             if pattern in line_lower:
@@ -345,7 +339,7 @@ class DownloadEngine:
         return False
 
     def _parse_output(self, line):
-        """Analisa a saída padrão do yt-dlp para extrair a percentagem e a velocidade."""
+        """Processa a saída em tempo real do yt-dlp para atualizar o progresso na UI."""
         if line.startswith("[download]") and "%" in line:
             self._on_phase("downloading")
             parts = line.split()
@@ -354,13 +348,13 @@ class DownloadEngine:
                 try:
                     pct = float(pct_str.replace('%', ''))
 
-                    # Throttle: só atualizar a cada 0.3s para não sobrecarregar a UI
+                    # Limita a frequência de atualização da interface gráfica para evitar sobrecarga
                     now = time.time()
                     if pct >= 100 or (now - self._last_progress_update) > 0.3:
                         self._last_progress_update = now
                         self._on_progress(pct)
 
-                        # Extrair o resto da info de velocidade e ETA
+                        # Extrai a velocidade atual e o tempo estimado (ETA) da linha de saída
                         speed = next((p for p in parts if "/s" in p), "")
                         eta = parts[-1] if "ETA" in line else ""
 
@@ -381,9 +375,7 @@ class DownloadEngine:
                   self._on_log(line, "info")
 
 
-# ─────────────────────────────────────────────
-#  CLASSE PRINCIPAL — UI
-# ─────────────────────────────────────────────
+# --- Interface Gráfica Principal (Tkinter) ---
 class PulsarUI:
     def __init__(self, root):
         self.root = root
@@ -392,7 +384,7 @@ class PulsarUI:
         self.root.minsize(800, 800)
         self.root.configure(bg=C["bg"])
 
-        # Managers
+        # Inicialização dos gerenciadores de configuração, fila e downloads
         self.config = ConfigManager()
         self.queue = QueueManager()
         self.engine = DownloadEngine(
@@ -403,7 +395,7 @@ class PulsarUI:
             on_phase=self._safe_phase,
         )
 
-        # Estado da UI
+        # Inicialização das variáveis de controle da interface
         self.download_path = tk.StringVar(value=self.config.get("download_path"))
         self.url_var        = tk.StringVar()
         self.format_var     = tk.StringVar(value=self.config.get("format"))
@@ -411,31 +403,31 @@ class PulsarUI:
         self.progress_var   = tk.DoubleVar(value=0)
         self.detected_platform = tk.StringVar(value="")
 
-        # Thumbnail state
-        self._thumbnail_image = None   # Manter referência para evitar GC
-        self._thumbnail_job = 0        # ID do job atual (para cancelar jobs antigos)
+        # Estado e referências para exibição de miniaturas (thumbnails)
+        self._thumbnail_image = None   # Retém a referência da imagem para evitar a coleta de lixo (GC)
+        self._thumbnail_job = 0        # Identificador único da requisição de miniatura ativa
 
-        # Auto-paste control
+        # Controle do status de colagem automática
         self._auto_pasted = False
 
-        # URL muda → detectar plataforma + buscar thumbnail
+        # Monitoramento para atualizar plataforma e miniatura ao alterar link
         self.url_var.trace_add("write", self._detect_platform)
         self.url_var.trace_add("write", self._on_url_change)
 
-        # Guardar preferências ao mudar
+        # Salvamento automático de preferências
         self.download_path.trace_add("write", self._save_prefs)
         self.format_var.trace_add("write", self._save_prefs)
 
         self._build_ui()
         self._check_dependencies()
 
-        # Auto-paste ao focar a janela
+        # Detecção de foco na janela para colagem automática
         self.root.bind("<FocusIn>", self._on_focus_in)
 
-        # Guardar preferências ao fechar
+        # Procedimentos de fechamento da aplicação
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
-    # ── THREAD-SAFE CALLBACKS ────────────────
+    # --- Callbacks Seguros para Threads (Thread-safe) ---
     def _safe_progress(self, pct):
         self.root.after(0, lambda p=pct: self.progress_var.set(p))
 
@@ -451,11 +443,11 @@ class PulsarUI:
     def _safe_phase(self, phase):
         self.root.after(0, lambda p=phase: self._set_phase(p))
 
-    # ── UI ──────────────────────────────────
+    # --- Montagem e Estrutura da Interface ---
     def _build_ui(self):
         self._style_ttk()
 
-        # ── HEADER ──
+        # Seção do cabeçalho
         header = tk.Frame(self.root, bg=C["bg"], pady=16)
         header.pack(fill="x", padx=28)
 
@@ -466,7 +458,7 @@ class PulsarUI:
         tk.Label(header, text="v2.0.1", font=F_SMALL,
                  fg=C["text_muted"], bg=C["bg"]).pack(side="left", padx=(10, 0), pady=(8, 0))
 
-        # Botão atualizar yt-dlp (direita do header)
+        # Botão para atualização do yt-dlp local
         self.update_btn = tk.Button(header, text="🔄 Atualizar yt-dlp",
                                      font=F_SMALL,
                                      bg=C["surface2"], fg=C["text_muted"],
@@ -478,15 +470,15 @@ class PulsarUI:
 
         self._sep()
 
-        # ── PAINEL INFERIOR (Garante que o botão não encolhe) ──
+        # Painel inferior fixo para controles principais
         bottom_panel = tk.Frame(self.root, bg=C["bg"])
         bottom_panel.pack(side="bottom", fill="both", expand=True)
 
-        # ── PAINEL PRINCIPAL ──
+        # Painel central para formulários e inputs
         main = tk.Frame(self.root, bg=C["bg"], padx=28)
         main.pack(fill="both", expand=True)
 
-        # — URL —
+        # Campo de entrada da URL
         self._label(main, "Link do vídeo")
         url_row = tk.Frame(main, bg=C["bg"])
         url_row.pack(fill="x", pady=(4, 2))
@@ -506,22 +498,22 @@ class PulsarUI:
                                        fg=C["success"], bg=C["bg"])
         self.platform_badge.pack(side="left", padx=(6, 0))
 
-        # Botão "Adicionar à fila"
+        # Botão para adicionar link ativo à fila de downloads
         queue_btn = self._btn(url_row, "+ Fila", self._add_to_queue,
                               color=C["border"], fg=C["text_dim"])
         queue_btn.pack(side="left", padx=(4, 0))
 
-        # — Thumbnail Container —
+        # Contêiner de exibição da miniatura do vídeo
         self.thumb_container = tk.Frame(main, bg=C["bg"])
         self.thumb_container.pack(fill="x")
         
-        # — Thumbnail preview (Sempre visível para evitar saltos no layout) —
+        # Visualização de dados dinâmicos do link (título, autor, miniatura)
         self.thumb_frame = tk.Frame(self.thumb_container, bg=C["surface"], bd=0,
                                     highlightthickness=1,
                                     highlightbackground=C["border"])
         self.thumb_frame.pack(fill="x", pady=(8, 0))
 
-        self.thumb_img_label = tk.Label(self.thumb_frame, bg=C["surface"], width=17, height=4) # Tamanho fixo placeholder
+        self.thumb_img_label = tk.Label(self.thumb_frame, bg=C["surface"], width=17, height=4) # Dimensões padrão para o espaço reservado
         self.thumb_img_label.pack(side="left", padx=(8, 10), pady=8)
 
         self.thumb_info_frame = tk.Frame(self.thumb_frame, bg=C["surface"])
@@ -542,7 +534,7 @@ class PulsarUI:
                                               anchor="w")
         self.thumb_duration_label.pack(fill="x", anchor="w")
 
-        # — Formato —
+        # Campo para escolha do formato e resolução do arquivo
         self._label(main, "Formato")
         fmt_row = tk.Frame(main, bg=C["bg"])
         fmt_row.pack(fill="x", pady=(4, 0))
@@ -554,14 +546,14 @@ class PulsarUI:
         self.fmt_menu.pack(side="left", fill="x", expand=True)
         self.fmt_menu.bind("<<ComboboxSelected>>", lambda e: self.root.focus_set())
 
-        # Estilizar o dropdown
+        # Estilização visual do Combobox
         self.root.option_add('*TCombobox*Listbox.selectBackground', C["accent"])
         self.root.option_add('*TCombobox*Listbox.selectForeground', C["text"])
         self.root.option_add('*TCombobox*Listbox.background', C["surface2"])
         self.root.option_add('*TCombobox*Listbox.foreground', C["text"])
         self.root.option_add('*TCombobox*Listbox.font', F_MAIN)
 
-        # — Pasta destino —
+        # Campo para seleção da pasta de destino
         self._label(main, "Guardar em")
         path_row = tk.Frame(main, bg=C["bg"])
         path_row.pack(fill="x", pady=(4, 0))
@@ -580,7 +572,7 @@ class PulsarUI:
                                color=C["surface2"], fg=C["text_dim"])
         browse_btn.pack(side="left", padx=(8, 0))
 
-        # — Fila de downloads —
+        # Seção da fila de download ativo
         self._label(main, "Fila  (0 itens)", attr="queue_label")
         self.queue_frame = tk.Frame(main, bg=C["surface"], bd=0,
                                     highlightthickness=1,
@@ -617,7 +609,7 @@ class PulsarUI:
         clear_btn.pack(anchor="e")
         clear_btn.bind("<Button-1>", lambda e: self._clear_queue())
 
-        # — Barra de progresso —
+        # Barra de progresso principal
         self._sep(pady=12, parent=bottom_panel)
         prog_frame = tk.Frame(bottom_panel, bg=C["bg"], padx=28)
         prog_frame.pack(fill="x")
@@ -626,7 +618,7 @@ class PulsarUI:
                                         maximum=100, style="Pulsar.Horizontal.TProgressbar")
         self.prog_bar.pack(fill="x", ipady=3)
 
-        # — Status + Abrir Pasta —
+        # Mensagem de status e atalho de visualização rápida
         status_row = tk.Frame(prog_frame, bg=C["bg"])
         status_row.pack(fill="x", pady=(4, 0))
 
@@ -643,9 +635,9 @@ class PulsarUI:
                                           relief="flat", bd=0, cursor="hand2",
                                           command=self._open_download_folder,
                                           padx=10, pady=4)
-        # Escondido inicialmente — aparece depois do download
+        # Escondido inicialmente por padrão
 
-        # — Botão principal (DESCARREGAR / CANCELAR) —
+        # Botão principal de ação (Iniciar Download / Interromper)
         btn_frame = tk.Frame(bottom_panel, bg=C["bg"], padx=28, pady=16)
         btn_frame.pack(fill="x")
 
@@ -661,20 +653,17 @@ class PulsarUI:
                                 padx=24, pady=12)
         self.dl_btn.pack(fill="x")
 
-        # hover
+        # Comportamento de foco/hover para o botão principal
         self.dl_btn.bind("<Enter>", lambda e: self._btn_hover_enter())
         self.dl_btn.bind("<Leave>", lambda e: self._btn_hover_leave())
 
-        # Toggle Log
+        # Variável controladora da visibilidade do console
         self.show_log_var = tk.BooleanVar(value=bool(self.config.get("show_log")))
 
-        # — Log de histórico —
-        self._sep(pady=4, parent=bottom_panel)
-
+        # Painel de registro histórico (Log)
         self.log_container = tk.Frame(bottom_panel, bg=C["bg"])
-        self.log_container.pack(fill="both", expand=True, side="bottom")
 
-        # Cabeçalho do log (sempre visível)
+        # Botão interativo para expansão do log
         log_header = tk.Frame(self.log_container, bg=C["bg"], padx=28)
         log_header.pack(fill="x")
 
@@ -684,7 +673,7 @@ class PulsarUI:
         self.log_toggle_btn.pack(side="left", pady=(4, 4))
         self.log_toggle_btn.bind("<Button-1>", self._toggle_log)
 
-        # Frame principal do log
+        # Painel de exibição enriquecido de texto do console
         self.log_frame = tk.Frame(self.log_container, bg=C["surface"], padx=28, pady=8)
 
         self.log_text = tk.Text(self.log_frame, font=F_MONO,
@@ -697,15 +686,13 @@ class PulsarUI:
         self.log_text.tag_config("info",  foreground=C["text_dim"])
         self.log_text.tag_config("warn",  foreground=C["warn"])
 
-        # Aplicar estado inicial do log
-        if self.show_log_var.get():
-            self.log_frame.pack(fill="both", expand=True, pady=(0, 12))
+        # Inicializa o log com a visibilidade salva
 
     def _style_ttk(self):
         s = ttk.Style()
         s.theme_use("clam")
 
-        # Remover o indicador de foco do Combobox
+        # Remove a borda pontilhada de foco interna do Combobox
         s.layout("Pulsar.TCombobox", [
             ('Combobox.field', {'children': [
                 ('Combobox.downarrow', {'side': 'right', 'sticky': 'ns'}),
@@ -764,10 +751,10 @@ class PulsarUI:
         f = tk.Frame(parent, bg=C["border"], height=1)
         f.pack(fill="x", padx=28, pady=pady)
 
-    # ── HOVER DO BOTÃO ──────────────────────
+    # --- Efeitos Visuais do Botão Principal ---
     def _btn_hover_enter(self):
         if self.engine.is_downloading:
-            self.dl_btn.config(bg="#dc2626")  # vermelho hover
+            self.dl_btn.config(bg="#dc2626")  # Cor de destaque de interrupção (vermelho)
         else:
             self.dl_btn.config(bg=C["accent2"])
 
@@ -777,7 +764,7 @@ class PulsarUI:
         else:
             self.dl_btn.config(bg=C["accent"])
 
-    # ── LOG TOGGLE ──────────────────────────
+    # --- Controle de Visibilidade do Log ---
     def _toggle_log(self, *_):
         is_visible = self.show_log_var.get()
         self.show_log_var.set(not is_visible)
@@ -789,20 +776,20 @@ class PulsarUI:
             self.log_toggle_btn.config(text="▶ Mostrar log")
             self.log_frame.pack_forget()
 
-        # Gravar a preferência no config
+        # Salva o estado de visibilidade configurado
         self.config.set("show_log", self.show_log_var.get())
         self.config.save()
 
-    # ── AUTO-PASTE ──────────────────────────
+    # --- Colagem Automática do Link ---
     def _on_focus_in(self, event):
-        """Ao focar a janela, colar URL do clipboard se o campo estiver vazio."""
-        # Só reagir ao foco da janela principal, não de widgets filhos
+        """Cola a URL da área de transferência ao focar a janela, se o campo estiver vazio."""
+        # Evita colisões de eventos gerados por subwidgets da janela
         if event.widget != self.root:
             return
         if self.url_var.get().strip():
-            return  # campo já tem conteúdo
+            return  # Campo já contém texto
         if self._auto_pasted:
-            return  # já colou nesta sessão de foco
+            return  # Impede nova colagem automática na mesma ativação de foco
 
         try:
             clipboard = self.root.clipboard_get().strip()
@@ -811,15 +798,15 @@ class PulsarUI:
                 self._auto_pasted = True
                 self._log("📋 URL colado automaticamente do clipboard.", "info")
         except (tk.TclError, Exception):
-            pass  # clipboard vazio ou inacessível
+            pass  # Ignora erros de clipboard vazio ou sem permissão de leitura
 
     def _reset_auto_paste(self, *_):
-        """Reset auto-paste flag quando o URL muda manualmente."""
+        """Reseta a flag de colagem automática ao detectar alteração manual no URL."""
         self._auto_pasted = False
 
-    # ── COLAR DO CLIPBOARD ──────────────────
+    # --- Colagem Manual do Clipboard ---
     def _paste_from_clipboard(self):
-        """Cola URL do clipboard para o campo de URL."""
+        """Copia o conteúdo textual da área de transferência para o campo de link."""
         try:
             clipboard = self.root.clipboard_get().strip()
             if clipboard:
@@ -828,25 +815,25 @@ class PulsarUI:
         except (tk.TclError, Exception):
             self._log("⚠ Clipboard vazio ou inacessível.", "warn")
 
-    # ── PROGRESS BAR INDETERMINADA ──────────
+    # --- Controle de Transição da Barra de Progresso ---
     def _set_phase(self, phase):
-        """Alterna entre barra de progresso determinada e indeterminada."""
+        """Controla a animação e o tipo de progresso com base na fase da tarefa."""
         if phase in ("connecting", "merging"):
-            # Modo indeterminado — animação de loading
+            # Modo indeterminado: exibe animação cíclica durante conexão/conversão
             self.prog_bar.config(mode="indeterminate")
             self.prog_bar.start(15)
         elif phase == "downloading":
-            # Modo determinado — mostra percentagem real
+            # Modo determinado: exibe porcentagem numérica exata do download
             self.prog_bar.stop()
             self.prog_bar.config(mode="determinate")
         else:
-            # None — download acabou
+            # Modo finalizado: zera o estado visual da barra
             self.prog_bar.stop()
             self.prog_bar.config(mode="determinate")
 
-    # ── THUMBNAIL PREVIEW ───────────────────
+    # --- Carregamento de Detalhes e Miniaturas ---
     def _on_url_change(self, *_):
-        """Quando o URL muda, tentar obter thumbnail."""
+        """Inicia o processo de obtenção de metadados ao alterar a URL."""
         url = self.url_var.get().strip()
         self._thumbnail_job += 1
         current_job = self._thumbnail_job
@@ -855,13 +842,13 @@ class PulsarUI:
             self._hide_thumbnail()
             return
 
-        # Esconde a thumbnail antiga enquanto carrega a nova
+        # Oculta a miniatura anterior antes de carregar o novo link
         self._hide_thumbnail()
 
         if not YT_DLP_AVAILABLE:
             return
 
-        # Lançar thread para obter info do vídeo
+        # Inicia a thread secundária para recuperação de metadados
         thread = threading.Thread(
             target=self._fetch_video_info,
             args=(url, current_job),
@@ -870,7 +857,7 @@ class PulsarUI:
         thread.start()
 
     def _fetch_video_info(self, url, job_id):
-        """Obtém informações do vídeo numa thread separada."""
+        """Busca os metadados do vídeo em uma thread em segundo plano."""
         try:
             ydl_opts = {
                 'quiet': True,
@@ -881,7 +868,7 @@ class PulsarUI:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
 
-            # Verificar se este job ainda é relevante
+            # Revalida se o link consultado ainda é o ativo na UI
             if job_id != self._thumbnail_job:
                 return
 
@@ -890,7 +877,7 @@ class PulsarUI:
             duration = info.get("duration", 0)
             thumbnail_url = info.get("thumbnail", "")
 
-            # Formatar duração
+            # Formatação do tempo de duração do vídeo (HH:MM:SS)
             if duration:
                 mins, secs = divmod(int(duration), 60)
                 hours, mins = divmod(mins, 60)
@@ -901,7 +888,7 @@ class PulsarUI:
             else:
                 dur_str = ""
 
-            # Descarregar thumbnail se Pillow estiver disponível
+            # Realiza o download da imagem caso a biblioteca Pillow esteja ativa
             thumb_img = None
             if PIL_AVAILABLE and thumbnail_url:
                 try:
@@ -916,32 +903,32 @@ class PulsarUI:
                 except Exception:
                     pass
 
-            # Verificar novamente se o job ainda é relevante
+            # Segunda validação de concorrência antes de pintar na tela
             if job_id != self._thumbnail_job:
                 return
 
-            # Atualizar UI no main thread
+            # Envia as atualizações visuais para execução na thread principal
             self.root.after(0, lambda: self._show_thumbnail(title, channel, dur_str, thumb_img))
 
         except Exception:
-            # Falha silenciosa — não mostrar thumbnail
+            # Oculta a miniatura em caso de falha de conexão ou erro do yt-dlp
             if job_id == self._thumbnail_job:
                 self.root.after(0, self._hide_thumbnail)
 
     def _show_thumbnail(self, title, channel, duration, thumb_img):
-        """Mostra a secção de thumbnail com info do vídeo."""
+        """Atualiza a interface para exibir os metadados e imagem extraídos."""
         self.thumb_title_label.config(text=title, fg=C["text"])
         self.thumb_channel_label.config(text=channel, fg=C["text_dim"])
         self.thumb_duration_label.config(text=f"⏱ {duration}" if duration else "")
 
         if thumb_img:
             self._thumbnail_image = thumb_img
-            self.thumb_img_label.config(image=thumb_img, width=0, height=0) # Reset placeholder size
+            self.thumb_img_label.config(image=thumb_img, width=0, height=0) # Redefine as dimensões para exibir a imagem real
         else:
             self.thumb_img_label.config(image="", width=17, height=4)
 
     def _hide_thumbnail(self):
-        """Esconde a info do vídeo e mostra o placeholder."""
+        """Restaura a visualização inicial da miniatura para modo placeholder."""
         if hasattr(self, 'thumb_title_label'):
             self.thumb_title_label.config(text="A aguardar link...", fg=C["text_dim"])
             self.thumb_channel_label.config(text="Insere um URL para ver os detalhes", fg=C["text_muted"])
@@ -949,9 +936,9 @@ class PulsarUI:
             self.thumb_img_label.config(image="", width=17, height=4)
         self._thumbnail_image = None
 
-    # ── ABRIR PASTA ─────────────────────────
+    # --- Acesso Rápido ao Diretório ---
     def _open_download_folder(self):
-        """Abre a pasta de downloads no Explorador de Ficheiros."""
+        """Abre o diretório configurado de downloads usando o gerenciador de arquivos nativo."""
         path = self.download_path.get()
         if os.path.isdir(path):
             if os.name == 'nt':
@@ -962,9 +949,9 @@ class PulsarUI:
             messagebox.showwarning("Pasta não encontrada",
                                    f"A pasta não existe:\n{path}")
 
-    # ── ATUALIZAR YT-DLP ────────────────────
+    # --- Atualização Dinâmica do yt-dlp ---
     def _update_ytdlp(self):
-        """Atualiza o yt-dlp para a versão mais recente."""
+        """Inicia o procedimento de atualização da biblioteca yt-dlp."""
         if self.engine.is_downloading:
             messagebox.showwarning("Download em curso",
                                    "Espera que o download termine antes de atualizar.")
@@ -978,15 +965,53 @@ class PulsarUI:
         thread.start()
 
     def _run_update_ytdlp(self):
-        """Executa a atualização do yt-dlp numa thread."""
+        """Executa a atualização do yt-dlp em segundo plano."""
         try:
-            python_exe = sys.executable
+            app_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+            local_ytdlp = os.path.join(app_dir, "yt-dlp.exe")
+
             if getattr(sys, 'frozen', False):
-                # Em modo .exe, não podemos usar pip
-                self.root.after(0, lambda: self._log("⚠ Não é possível atualizar no modo .exe", "warn"))
-                self.root.after(0, lambda: self._set_status("Atualização não disponível em .exe", C["warn"]))
+                # No modo compilado .exe, descarrega o yt-dlp.exe mais recente do GitHub
+                self.root.after(0, lambda: self._log("📥 A descarregar yt-dlp.exe mais recente do GitHub...", "info"))
+                self.root.after(0, lambda: self._set_status("A atualizar yt-dlp...", C["warn"]))
+
+                import urllib.request
+                url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
+                temp_path = os.path.join(app_dir, "yt-dlp_temp.exe")
+                
+                req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                with urllib.request.urlopen(req, timeout=45) as response, open(temp_path, 'wb') as out_file:
+                    shutil.copyfileobj(response, out_file)
+
+                # Substituir o antigo pelo novo
+                if os.path.exists(local_ytdlp):
+                    try:
+                        os.remove(local_ytdlp)
+                    except OSError:
+                        # Se estiver em uso, tenta renomear para remover no próximo arranque
+                        if os.path.exists(local_ytdlp + ".bak"):
+                            try:
+                                os.remove(local_ytdlp + ".bak")
+                            except Exception:
+                                pass
+                        os.rename(local_ytdlp, local_ytdlp + ".bak")
+                
+                os.rename(temp_path, local_ytdlp)
+                
+                # Apagar ficheiro .bak se existir
+                try:
+                    if os.path.exists(local_ytdlp + ".bak"):
+                        os.remove(local_ytdlp + ".bak")
+                except Exception:
+                    pass
+
+                self.root.after(0, lambda: self._log("✓ yt-dlp atualizado com sucesso!", "ok"))
+                self.root.after(0, lambda: self._set_status("yt-dlp atualizado com sucesso!", C["success"]))
+                self.root.after(0, lambda: messagebox.showinfo("Atualização Concluída", "O yt-dlp foi atualizado para a versão mais recente!"))
                 return
 
+            # No modo desenvolvimento script, executa pip install -U
+            python_exe = sys.executable
             creationflags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
             result = subprocess.run(
                 [python_exe, "-m", "pip", "install", "-U", "yt-dlp"],
@@ -995,7 +1020,7 @@ class PulsarUI:
             )
 
             if result.returncode == 0:
-                # Verificar se houve atualização
+                # Analisa o retorno do pip para exibir a mensagem correta
                 if "already satisfied" in result.stdout.lower() or "already up-to-date" in result.stdout.lower():
                     self.root.after(0, lambda: self._log("✓ yt-dlp já está na versão mais recente.", "ok"))
                     self.root.after(0, lambda: self._set_status("yt-dlp atualizado!", C["success"]))
@@ -1015,7 +1040,7 @@ class PulsarUI:
             self.root.after(0, lambda: self.update_btn.config(
                 state="normal", text="🔄 Atualizar yt-dlp", fg=C["text_muted"]))
 
-    # ── LÓGICA ──────────────────────────────
+# --- Processamento Principal e Regras de Negócio ---
 
     def _detect_platform(self, *_):
         url = self.url_var.get()
@@ -1069,11 +1094,11 @@ class PulsarUI:
                            font=F_MONO, bg=C["surface"], fg=C["text_dim"], anchor="w")
             lbl.pack(side="left", fill="x", expand=True)
             
-            # Hover button
+                # Botão de remoção (mostrado no hover)
             btn_rm = tk.Label(row_frame, text="✕", font=F_BOLD,
                               bg=C["surface"], fg=C["error"], cursor="hand2")
             
-            # Hover effects
+                # Define comportamento visual ao passar o mouse
             def on_enter(e, r=row_frame, l=lbl, b=btn_rm):
                 r.config(bg=C["border"])
                 l.config(bg=C["border"], fg=C["text"])
@@ -1100,7 +1125,7 @@ class PulsarUI:
         self._render_queue()
 
     def _validate_url(self, url):
-        """Verifica se a URL começa com http:// ou https://."""
+        """Verifica a validade do protocolo de rede do link."""
         if not url.startswith(("http://", "https://")):
             messagebox.showwarning(
                 "URL inválida",
@@ -1110,17 +1135,30 @@ class PulsarUI:
         return True
 
     def _save_prefs(self, *_):
-        """Guarda preferências sempre que download_path ou format mudam."""
+        """Salva as configurações atuais no arquivo de configuração."""
         self.config.set("download_path", self.download_path.get())
         self.config.set("format", self.format_var.get())
         self.config.save()
 
     def _check_dependencies(self):
-        if not YT_DLP_AVAILABLE:
-            self._log("yt-dlp não encontrado. Instala com:  pip install yt-dlp", "err")
-            self._set_status("⚠  Dependência em falta — ver log", C["error"])
+        # Verificar se existe yt-dlp.exe local
+        app_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+        local_ytdlp = os.path.join(app_dir, "yt-dlp.exe")
+        
+        if os.path.exists(local_ytdlp):
+            # Obter versão do local
+            try:
+                creationflags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+                res = subprocess.run([local_ytdlp, "--version"], capture_output=True, text=True, creationflags=creationflags)
+                version = res.stdout.strip()
+                self._log(f"yt-dlp (local exe) {version} pronto.", "ok")
+            except Exception:
+                self._log("yt-dlp (local exe) pronto.", "ok")
+        elif not YT_DLP_AVAILABLE:
+            self._log("⚠  yt-dlp não encontrado. Clica em 'Atualizar yt-dlp' para descarregar.", "err")
+            self._set_status("⚠  yt-dlp em falta — clica em Atualizar yt-dlp", C["error"])
         else:
-            self._log(f"yt-dlp {yt_dlp.version.__version__} pronto.", "ok")
+            self._log(f"yt-dlp (embutido) {yt_dlp.version.__version__} pronto.", "ok")
 
         if not self._is_ffmpeg_installed():
             self._log("⚠  FFmpeg NÃO ENCONTRADO! Audio/MP4 não vai juntar.", "warn")
@@ -1128,30 +1166,122 @@ class PulsarUI:
             self._log("FFmpeg pronto.", "ok")
 
     def _is_ffmpeg_installed(self):
-        """Verifica se o executável ffmpeg existe no sistema/PATH."""
-        return shutil.which("ffmpeg") is not None
+        """Verifica a presença da dependência FFmpeg no PATH ou localmente."""
+        if shutil.which("ffmpeg") is not None:
+            return True
+        app_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+        local_ffmpeg = os.path.join(app_dir, "ffmpeg.exe")
+        return os.path.exists(local_ffmpeg)
+
+    def _download_ffmpeg(self):
+        """Faz o download e instalação automatizada do pacote FFmpeg compilado para Windows."""
+        self.dl_btn.config(state="disabled")
+        self._set_status("A descarregar FFmpeg (cerca de 100MB)...", C["warn"])
+        self.prog_bar.config(mode="indeterminate")
+        self.prog_bar.start(15)
+        
+        def run():
+            temp_zip_path = ""
+            try:
+                import urllib.request
+                import zipfile
+                
+                app_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+                url = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
+                
+                # Define diretório temporário para download do instalador compactado
+                temp_zip_path = os.path.join(app_dir, "ffmpeg_temp.zip")
+                
+                self.root.after(0, lambda: self._log("📥 A descarregar FFmpeg de gyan.dev...", "info"))
+                
+                # Executa requisição do arquivo compactado configurando User-Agent
+                req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                with urllib.request.urlopen(req, timeout=30) as response, open(temp_zip_path, 'wb') as out_file:
+                    shutil.copyfileobj(response, out_file)
+                
+                self.root.after(0, lambda: self._log("📦 A extrair ffmpeg.exe...", "info"))
+                self.root.after(0, lambda: self._set_status("A extrair FFmpeg...", C["warn"]))
+                
+                # Extrai unicamente o executável ffmpeg.exe do arquivo compactado
+                extracted = False
+                with zipfile.ZipFile(temp_zip_path, 'r') as zip_ref:
+                    for file_info in zip_ref.infolist():
+                        if file_info.filename.endswith("bin/ffmpeg.exe"):
+                            # Grava o binário extraído no diretório principal da aplicação
+                            with zip_ref.open(file_info) as source, open(os.path.join(app_dir, "ffmpeg.exe"), "wb") as target:
+                                shutil.copyfileobj(source, target)
+                            extracted = True
+                            break
+                
+                # Exclui o instalador compactado temporário da máquina
+                if temp_zip_path and os.path.exists(temp_zip_path):
+                    os.remove(temp_zip_path)
+                
+                if extracted:
+                    self.root.after(0, lambda: self._log("✓ FFmpeg descarregado e instalado com sucesso!", "ok"))
+                    self.root.after(0, lambda: messagebox.showinfo("FFmpeg Instalado", "O FFmpeg foi descarregado e instalado com sucesso na pasta da app! Já podes começar a descarregar vídeos/músicas."))
+                    self.root.after(0, lambda: self._set_status("FFmpeg instalado com sucesso.", C["success"]))
+                else:
+                    self.root.after(0, lambda: self._log("✗ Erro: Não foi possível encontrar ffmpeg.exe dentro do ficheiro descarregado.", "err"))
+                    self.root.after(0, lambda: messagebox.showerror("Erro de Instalação", "O download foi concluído, mas o ffmpeg.exe não foi encontrado no arquivo."))
+                    self.root.after(0, lambda: self._set_status("Erro ao instalar FFmpeg.", C["error"]))
+                    
+            except Exception as e:
+                self.root.after(0, lambda: self._log(f"✗ Erro ao descarregar FFmpeg: {str(e)[:80]}", "err"))
+                self.root.after(0, lambda: messagebox.showerror("Erro no download", f"Ocorreu um erro ao descarregar o FFmpeg:\n{str(e)[:120]}\n\nPodes descarregá-lo manualmente e colocá-lo na pasta da aplicação."))
+                self.root.after(0, lambda: self._set_status("Falha no download do FFmpeg.", C["error"]))
+                # Exclui o instalador compactado temporário da máquina se existir
+                try:
+                    if temp_zip_path and os.path.exists(temp_zip_path):
+                        os.remove(temp_zip_path)
+                except Exception:
+                    pass
+            finally:
+                self.root.after(0, self._stop_ffmpeg_download_loading)
+
+        threading.Thread(target=run, daemon=True).start()
+
+    def _stop_ffmpeg_download_loading(self):
+        self.prog_bar.stop()
+        self.prog_bar.config(mode="determinate")
+        self.progress_var.set(0)
+        self.dl_btn.config(state="normal")
 
     def _start_download(self):
-        # Se já está a descarregar, o botão funciona como CANCELAR
+        # Age como interrupção se um processo de download já estiver em andamento
         if self.engine.is_downloading:
             self.engine.cancel()
             self.dl_btn.config(state="disabled", text="A cancelar...")
             self._set_status("A cancelar download...", C["warn"])
             return
 
-        if not YT_DLP_AVAILABLE:
+        # Verifica se o yt-dlp está disponível (módulo Python ou executável local)
+        app_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+        local_ytdlp = os.path.join(app_dir, "yt-dlp.exe")
+        if not YT_DLP_AVAILABLE and not os.path.exists(local_ytdlp):
             messagebox.showerror("Dependência em falta",
-                                 "Instala o yt-dlp primeiro:\n\npip install yt-dlp")
+                                 "O yt-dlp não foi encontrado!\n\n"
+                                 "Clica em '🔄 Atualizar yt-dlp' para descarregar automaticamente,\n"
+                                 "ou instala manualmente com: pip install yt-dlp")
             return
 
         if not self._is_ffmpeg_installed():
             msg = (
-                "O FFmpeg não foi encontrado no teu computador!\n\n"
-                "Para criares MP4s num único ficheiro e converteres para MP3, o FFmpeg é OBRIGATÓRIO. "
-                "Sem ele, os vídeos vão ficar com áudio e imagem separados (.webm e .m4a).\n\n"
-                "Queres continuar mesmo assim?"
+                "O FFmpeg não foi encontrado localmente nem no teu computador!\n\n"
+                "Ele é OBRIGATÓRIO para juntar vídeo/áudio e para converter para MP3.\n\n"
+                "Queres descarregar e instalar o FFmpeg automaticamente agora?\n"
+                "(Recomendado, cerca de 100 MB. Irá descarregar em segundo plano)"
             )
-            if not messagebox.askyesno("FFmpeg em falta", msg):
+            if messagebox.askyesno("FFmpeg em falta", msg):
+                self._download_ffmpeg()
+                return
+            
+            # Confirmação caso o usuário decida rodar a aplicação sem o FFmpeg
+            msg_continue = (
+                "Se continuares sem FFmpeg, os downloads podem ficar sem som ou "
+                "com áudio e vídeo separados.\n\nPretendes continuar mesmo assim?"
+            )
+            if not messagebox.askyesno("Continuar sem FFmpeg?", msg_continue):
                 return
 
         url = self.url_var.get().strip()
@@ -1159,20 +1289,20 @@ class PulsarUI:
             messagebox.showwarning("URL vazia", "Introduz um URL ou adiciona itens à fila.")
             return
 
-        # Validar URL do campo
+        # Executa validação de formato no link inserido
         if url and not self._validate_url(url):
             return
 
-        # Se há URL no campo, usar só esse; se fila, usar fila
+        # Decide se processará o link individual ativo ou a fila de tarefas
         if url:
             jobs = [{"url": url, "format": self.format_var.get()}]
         else:
             jobs = self.queue.items()
 
-        # Esconder botão "Abrir pasta"
+        # Oculta o atalho do diretório ao iniciar novo download
         self.open_folder_btn.pack_forget()
 
-        # Trocar botão para modo CANCELAR
+        # Atualiza a interface gráfica para o estado de cancelamento
         self.dl_btn.config(text="■  CANCELAR", bg=C["error"])
         self.progress_var.set(0)
 
@@ -1187,10 +1317,10 @@ class PulsarUI:
             self._set_status(
                 f"Concluído! Ficheiros em: {self.download_path.get()}", C["success"]
             )
-            # Mostrar botão "Abrir pasta"
+            # Habilita o atalho visual para a pasta de downloads
             self.open_folder_btn.pack(side="right")
 
-            # Notificação sonora
+            # Emite alerta sonoro de conclusão no Windows
             if WINSOUND_AVAILABLE:
                 try:
                     winsound.MessageBeep(winsound.MB_ICONASTERISK)
@@ -1214,27 +1344,25 @@ class PulsarUI:
         self.log_text.config(state="disabled")
 
     def _on_close(self):
-        """Guardar configurações e fechar a aplicação."""
+        """Executa rotinas de persistência e encerramento da interface."""
         self._save_prefs()
         self.root.destroy()
 
 
-# ─────────────────────────────────────────────
-#  ENTRY POINT
-# ─────────────────────────────────────────────
+# --- Ponto de Entrada da Aplicação ---
 if __name__ == "__main__":
     import multiprocessing
     multiprocessing.freeze_support()
 
-    # Interceta as chamadas recursivas do subprocesso quando compilado em .exe
+    # Trata as invocações de multiprocessamento nativas do yt-dlp no executável compilation
     if len(sys.argv) > 1 and sys.argv[1] == "--run-yt-dlp":
-        sys.argv.pop(1)  # Remove a flag para o yt-dlp não se queixar
+        sys.argv.pop(1)  # Remove o parâmetro interno para evitar conflitos no yt-dlp
         import yt_dlp
         sys.exit(yt_dlp.main())
 
     root = tk.Tk()
 
-    # Ícone (ignora se não existir)
+    # Carrega e define o ícone padrão da interface gráfica se disponível
     try:
         base = os.path.dirname(os.path.abspath(__file__))
         icon_path = os.path.join(base, "assets", "icon.ico")
