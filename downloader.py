@@ -34,6 +34,14 @@ try:
 except ImportError:
     PIL_AVAILABLE = False
 
+# Suporte a imagens HEIC (iPhone) via pillow-heif
+try:
+    from pillow_heif import register_heif_opener
+    register_heif_opener()
+    HEIF_AVAILABLE = True
+except ImportError:
+    HEIF_AVAILABLE = False
+
 # Importação dinâmica da biblioteca yt-dlp
 try:
     import yt_dlp
@@ -379,7 +387,7 @@ class DownloadEngine:
 class PulsarUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("SlayerDownloader")
+        self.root.title("SlayerHub")
         self.root.geometry("800x800")
         self.root.minsize(800, 800)
         self.root.configure(bg=C["bg"])
@@ -402,6 +410,13 @@ class PulsarUI:
         self.status_var     = tk.StringVar(value="Pronto para descarregar.")
         self.progress_var   = tk.DoubleVar(value=0)
         self.detected_platform = tk.StringVar(value="")
+
+        # Inicialização das variáveis de controle do conversor de formatos
+        self.conv_file_var = tk.StringVar(value="")
+        self.conv_format_var = tk.StringVar(value="")
+        self.is_converting = False
+        self.conv_process = None
+        self.conv_thread = None
 
         # Estado e referências para exibição de miniaturas (thumbnails)
         self._thumbnail_image = None   # Retém a referência da imagem para evitar a coleta de lixo (GC)
@@ -453,9 +468,9 @@ class PulsarUI:
 
         tk.Label(header, text="SLAYER", font=F_TITLE,
                  fg=C["accent"], bg=C["bg"]).pack(side="left")
-        tk.Label(header, text="DOWNLOADER", font=("Calibri", 22),
+        tk.Label(header, text="HUB", font=("Calibri", 22),
                  fg=C["text_dim"], bg=C["bg"]).pack(side="left", padx=(6, 0))
-        tk.Label(header, text="v2.0.1", font=F_SMALL,
+        tk.Label(header, text="v2.1.0", font=F_SMALL,
                  fg=C["text_muted"], bg=C["bg"]).pack(side="left", padx=(10, 0), pady=(8, 0))
 
         # Botão para atualização do yt-dlp local
@@ -470,13 +485,107 @@ class PulsarUI:
 
         self._sep()
 
-        # Painel inferior fixo para controles principais
-        bottom_panel = tk.Frame(self.root, bg=C["bg"])
-        bottom_panel.pack(side="bottom", fill="both", expand=True)
+        # --- Menu de Navegação por Abas ---
+        self.nav_frame = tk.Frame(self.root, bg=C["bg"])
+        self.nav_frame.pack(fill="x", padx=28, pady=(4, 8))
 
-        # Painel central para formulários e inputs
-        main = tk.Frame(self.root, bg=C["bg"], padx=28)
-        main.pack(fill="both", expand=True)
+        self.tab_downloader_btn = tk.Button(self.nav_frame, text="📥 Downloader", font=F_BOLD,
+                                            bg=C["accent"], fg="#ffffff", activebackground=C["accent2"], activeforeground="#ffffff",
+                                            relief="flat", bd=0, cursor="hand2", padx=20, pady=8,
+                                            command=lambda: self._switch_tab("downloader"))
+        self.tab_downloader_btn.pack(side="left", padx=(0, 10))
+
+        self.tab_converter_btn = tk.Button(self.nav_frame, text="🔄 Conversor", font=F_BOLD,
+                                           bg=C["surface2"], fg=C["text_dim"], activebackground=C["accent"], activeforeground="#ffffff",
+                                           relief="flat", bd=0, cursor="hand2", padx=20, pady=8,
+                                           command=lambda: self._switch_tab("converter"))
+        self.tab_converter_btn.pack(side="left")
+
+        self._sep(pady=4)
+
+        # --- Painel Inferior Fixo (Status, Progresso e Log) ---
+        bottom_panel = tk.Frame(self.root, bg=C["bg"])
+        bottom_panel.pack(side="bottom", fill="x")
+
+        # Barra de progresso principal
+        self._sep(pady=12, parent=bottom_panel)
+        prog_frame = tk.Frame(bottom_panel, bg=C["bg"], padx=28)
+        prog_frame.pack(fill="x")
+
+        self.prog_bar = ttk.Progressbar(prog_frame, variable=self.progress_var,
+                                        maximum=100, style="Pulsar.Horizontal.TProgressbar")
+        self.prog_bar.pack(fill="x", ipady=3)
+
+        # Mensagem de status e atalho de visualização rápida
+        status_row = tk.Frame(prog_frame, bg=C["bg"])
+        status_row.pack(fill="x", pady=(4, 0))
+
+        self.status_label = tk.Label(status_row, textvariable=self.status_var,
+                                     font=F_BOLD,
+                                     fg=C["text_dim"], bg=C["bg"],
+                                     anchor="w")
+        self.status_label.pack(side="left", fill="x", expand=True)
+
+        self.open_folder_btn = tk.Button(status_row, text="📂 Abrir pasta",
+                                          font=F_SMALL,
+                                          bg=C["surface2"], fg=C["success"],
+                                          activebackground=C["accent"], activeforeground="#fff",
+                                          relief="flat", bd=0, cursor="hand2",
+                                          command=self._open_download_folder,
+                                          padx=10, pady=4)
+        # Escondido inicialmente por padrão
+
+        # Variável controladora da visibilidade do console
+        self.show_log_var = tk.BooleanVar(value=bool(self.config.get("show_log")))
+
+        # Painel de registro histórico (Log)
+        self.log_container = tk.Frame(bottom_panel, bg=C["bg"])
+
+        # Botão interativo para expansão do log
+        log_header = tk.Frame(self.log_container, bg=C["bg"], padx=28)
+        log_header.pack(fill="x")
+
+        self.log_toggle_btn = tk.Label(log_header, text="▼ Ocultar log" if self.show_log_var.get() else "▶ Mostrar log",
+                                       font=F_SMALL,
+                                       fg=C["text_muted"], bg=C["bg"], cursor="hand2")
+        self.log_toggle_btn.pack(side="left", pady=(4, 4))
+        self.log_toggle_btn.bind("<Button-1>", self._toggle_log)
+
+        # Painel de exibição enriquecido de texto do console
+        self.log_frame = tk.Frame(self.log_container, bg=C["surface"], padx=28, pady=8)
+
+        self.log_text = tk.Text(self.log_frame, font=F_MONO,
+                                bg=C["surface"], fg=C["text_dim"],
+                                relief="flat", bd=0, state="disabled",
+                                height=4, wrap="word")
+        self.log_text.pack(fill="both", expand=True)
+        self.log_text.tag_config("ok",    foreground=C["success"])
+        self.log_text.tag_config("err",   foreground=C["error"])
+        self.log_text.tag_config("info",  foreground=C["text_dim"])
+        self.log_text.tag_config("warn",  foreground=C["warn"])
+
+        # Inicializa o log com a visibilidade salva
+        self.log_container.pack(fill="x", side="bottom")
+        if self.show_log_var.get():
+            self.log_frame.pack(fill="both", expand=True, pady=(0, 12))
+        else:
+            self.log_frame.pack_forget()
+
+        # --- Frame de Conteúdo Principal (Abas) ---
+        self.content_frame = tk.Frame(self.root, bg=C["bg"])
+        self.content_frame.pack(fill="both", expand=True, padx=28, pady=(15, 20))
+
+        # --- ABA 1: DOWNLOADER ---
+        self.downloader_page = tk.Frame(self.content_frame, bg=C["bg"])
+        self.downloader_page.pack(fill="both", expand=True, padx=12, pady=12)
+        self._build_downloader_tab()
+
+        # --- ABA 2: CONVERSOR ---
+        self.converter_page = tk.Frame(self.content_frame, bg=C["bg"])
+        self._build_converter_tab()
+
+    def _build_downloader_tab(self):
+        main = self.downloader_page
 
         # Campo de entrada da URL
         self._label(main, "Link do vídeo")
@@ -500,7 +609,7 @@ class PulsarUI:
 
         # Botão para adicionar link ativo à fila de downloads
         queue_btn = self._btn(url_row, "+ Fila", self._add_to_queue,
-                              color=C["border"], fg=C["text_dim"])
+                               color=C["border"], fg=C["text_dim"])
         queue_btn.pack(side="left", padx=(4, 0))
 
         # Contêiner de exibição da miniatura do vídeo
@@ -520,8 +629,8 @@ class PulsarUI:
         self.thumb_info_frame.pack(side="left", fill="both", expand=True, pady=8, padx=(0, 8))
 
         self.thumb_title_label = tk.Label(self.thumb_info_frame, text="A aguardar link...",
-                                          font=F_BOLD, fg=C["text_dim"], bg=C["surface"],
-                                          wraplength=450, justify="left", anchor="nw")
+                                           font=F_BOLD, fg=C["text_dim"], bg=C["surface"],
+                                           wraplength=450, justify="left", anchor="nw")
         self.thumb_title_label.pack(fill="x", anchor="w")
 
         self.thumb_channel_label = tk.Label(self.thumb_info_frame, text="Insere um URL para ver os detalhes",
@@ -545,13 +654,6 @@ class PulsarUI:
                                      font=F_MAIN, takefocus=0)
         self.fmt_menu.pack(side="left", fill="x", expand=True)
         self.fmt_menu.bind("<<ComboboxSelected>>", lambda e: self.root.focus_set())
-
-        # Estilização visual do Combobox
-        self.root.option_add('*TCombobox*Listbox.selectBackground', C["accent"])
-        self.root.option_add('*TCombobox*Listbox.selectForeground', C["text"])
-        self.root.option_add('*TCombobox*Listbox.background', C["surface2"])
-        self.root.option_add('*TCombobox*Listbox.foreground', C["text"])
-        self.root.option_add('*TCombobox*Listbox.font', F_MAIN)
 
         # Campo para seleção da pasta de destino
         self._label(main, "Guardar em")
@@ -609,37 +711,12 @@ class PulsarUI:
         clear_btn.pack(anchor="e")
         clear_btn.bind("<Button-1>", lambda e: self._clear_queue())
 
-        # Barra de progresso principal
-        self._sep(pady=12, parent=bottom_panel)
-        prog_frame = tk.Frame(bottom_panel, bg=C["bg"], padx=28)
-        prog_frame.pack(fill="x")
-
-        self.prog_bar = ttk.Progressbar(prog_frame, variable=self.progress_var,
-                                        maximum=100, style="Pulsar.Horizontal.TProgressbar")
-        self.prog_bar.pack(fill="x", ipady=3)
-
-        # Mensagem de status e atalho de visualização rápida
-        status_row = tk.Frame(prog_frame, bg=C["bg"])
-        status_row.pack(fill="x", pady=(4, 0))
-
-        self.status_label = tk.Label(status_row, textvariable=self.status_var,
-                                     font=F_BOLD,
-                                     fg=C["text_dim"], bg=C["bg"],
-                                     anchor="w")
-        self.status_label.pack(side="left", fill="x", expand=True)
-
-        self.open_folder_btn = tk.Button(status_row, text="📂 Abrir pasta",
-                                          font=F_SMALL,
-                                          bg=C["surface2"], fg=C["success"],
-                                          activebackground=C["accent"], activeforeground="#fff",
-                                          relief="flat", bd=0, cursor="hand2",
-                                          command=self._open_download_folder,
-                                          padx=10, pady=4)
-        # Escondido inicialmente por padrão
-
-        # Botão principal de ação (Iniciar Download / Interromper)
-        btn_frame = tk.Frame(bottom_panel, bg=C["bg"], padx=28, pady=16)
-        btn_frame.pack(fill="x")
+        # Botão principal de ação do Downloader
+        btn_frame = tk.Frame(main, bg=C["bg"], pady=12)
+        btn_frame.pack(fill="x", side="bottom")
+        # Ensure the download button stays visible by preventing the window from being resized below needed size
+        self.root.update_idletasks()
+        self.root.minsize(self.root.winfo_width(), self.root.winfo_height())
 
         self.dl_btn = tk.Button(btn_frame,
                                 text="▼  DESCARREGAR",
@@ -650,41 +727,436 @@ class PulsarUI:
                                 relief="flat", bd=0,
                                 cursor="hand2",
                                 command=self._start_download,
-                                padx=24, pady=12)
+                                padx=24, pady=10)
         self.dl_btn.pack(fill="x")
 
         # Comportamento de foco/hover para o botão principal
         self.dl_btn.bind("<Enter>", lambda e: self._btn_hover_enter())
         self.dl_btn.bind("<Leave>", lambda e: self._btn_hover_leave())
 
-        # Variável controladora da visibilidade do console
-        self.show_log_var = tk.BooleanVar(value=bool(self.config.get("show_log")))
+    def _build_converter_tab(self):
+        main = self.converter_page
 
-        # Painel de registro histórico (Log)
-        self.log_container = tk.Frame(bottom_panel, bg=C["bg"])
+        # Campo para escolha do ficheiro de entrada
+        self._label(main, "Ficheiro para Converter")
+        file_row = tk.Frame(main, bg=C["bg"])
+        file_row.pack(fill="x", pady=(4, 2))
 
-        # Botão interativo para expansão do log
-        log_header = tk.Frame(self.log_container, bg=C["bg"], padx=28)
-        log_header.pack(fill="x")
+        self.conv_file_entry = tk.Entry(file_row, textvariable=self.conv_file_var,
+                                        font=F_MAIN, state="readonly",
+                                        bg=C["entry_bg"], fg=C["text_dim"],
+                                        readonlybackground=C["entry_bg"],
+                                        relief="flat", bd=0,
+                                        highlightthickness=1,
+                                        highlightbackground=C["border"],
+                                        highlightcolor=C["accent"])
+        self.conv_file_entry.pack(side="left", fill="x", expand=True, ipady=8, ipadx=8)
 
-        self.log_toggle_btn = tk.Label(log_header, text="▼ Ocultar log" if self.show_log_var.get() else "▶ Mostrar log",
-                                       font=F_SMALL,
-                                       fg=C["text_muted"], bg=C["bg"], cursor="hand2")
-        self.log_toggle_btn.pack(side="left", pady=(4, 4))
-        self.log_toggle_btn.bind("<Button-1>", self._toggle_log)
+        browse_file_btn = self._btn(file_row, "Escolher Ficheiro", self._browse_conv_file,
+                                    color=C["border"], fg=C["text_dim"])
+        browse_file_btn.pack(side="left", padx=(8, 0))
 
-        # Painel de exibição enriquecido de texto do console
-        self.log_frame = tk.Frame(self.log_container, bg=C["surface"], padx=28, pady=8)
+        # Preview do ficheiro / Informações
+        self.conv_info_frame = tk.Frame(main, bg=C["surface"], bd=0,
+                                        highlightthickness=1,
+                                        highlightbackground=C["border"])
+        self.conv_info_frame.pack(fill="x", pady=(8, 0))
+        
+        self.conv_file_label = tk.Label(self.conv_info_frame, text="Nenhum ficheiro selecionado",
+                                        font=F_BOLD, fg=C["text_dim"], bg=C["surface"],
+                                        wraplength=700, justify="left", anchor="w", padx=12, pady=12)
+        self.conv_file_label.pack(fill="x")
 
-        self.log_text = tk.Text(self.log_frame, font=F_MONO,
-                                bg=C["surface"], fg=C["text_dim"],
-                                relief="flat", bd=0, state="disabled",
-                                height=4, wrap="word")
-        self.log_text.pack(fill="both", expand=True)
-        self.log_text.tag_config("ok",    foreground=C["success"])
-        self.log_text.tag_config("err",   foreground=C["error"])
-        self.log_text.tag_config("info",  foreground=C["text_dim"])
-        self.log_text.tag_config("warn",  foreground=C["warn"])
+        # Formato de saída
+        self._label(main, "Formato de Saída")
+        fmt_row = tk.Frame(main, bg=C["bg"])
+        fmt_row.pack(fill="x", pady=(4, 0))
+
+        # Inicializa o menu de formatos com todos os formatos combinados
+        self.conv_formats_list = []
+        self.conv_fmt_menu = ttk.Combobox(fmt_row, textvariable=self.conv_format_var,
+                                          values=self.conv_formats_list,
+                                          state="readonly", style="Pulsar.TCombobox",
+                                          font=F_MAIN, takefocus=0)
+        self.conv_fmt_menu.pack(side="left", fill="x", expand=True)
+        self.conv_fmt_menu.bind("<<ComboboxSelected>>", lambda e: self.root.focus_set())
+
+        # Directório de destino (Mostra que vai guardar na pasta de downloads)
+        self._label(main, "Guardar em")
+        dest_row = tk.Frame(main, bg=C["bg"])
+        dest_row.pack(fill="x", pady=(4, 0))
+
+        self.conv_dest_label = tk.Label(dest_row, textvariable=self.download_path,
+                                        font=F_MAIN, anchor="w",
+                                        bg=C["entry_bg"], fg=C["text_dim"],
+                                        relief="flat", bd=0,
+                                        highlightthickness=1,
+                                        highlightbackground=C["border"])
+        self.conv_dest_label.pack(side="left", fill="x", expand=True, ipady=8, ipadx=8)
+
+        browse_dest_btn = self._btn(dest_row, "Escolher", self._browse_folder,
+                                    color=C["surface2"], fg=C["text_dim"])
+        browse_dest_btn.pack(side="left", padx=(8, 0))
+
+        # Espaçador vertical para empurrar o botão para baixo e dar ar limpo
+        tk.Frame(main, bg=C["bg"], height=80).pack()
+
+        # Botão principal de ação do Conversor
+        btn_frame = tk.Frame(main, bg=C["bg"], pady=12)
+        btn_frame.pack(fill="x", side="bottom")
+
+        self.conv_btn = tk.Button(btn_frame,
+                                  text="🔄  CONVERTER",
+                                  font=("Segoe UI", 16, "bold"),
+                                  bg=C["accent"], fg="#ffffff",
+                                  activebackground=C["accent2"],
+                                  activeforeground="#ffffff",
+                                  relief="flat", bd=0,
+                                  cursor="hand2",
+                                  command=self._start_conversion,
+                                  padx=24, pady=10)
+        self.conv_btn.pack(fill="x")
+
+        # Hover effects
+        self.conv_btn.bind("<Enter>", lambda e: self._conv_btn_hover_enter())
+        self.conv_btn.bind("<Leave>", lambda e: self._conv_btn_hover_leave())
+
+    def _browse_conv_file(self):
+        filetypes = [
+            ("Todos os Ficheiros Suportados", "*.mp4 *.mkv *.avi *.mov *.wmv *.webm *.flv *.mp3 *.wav *.m4a *.aac *.flac *.ogg *.png *.jpg *.jpeg *.webp *.heic *.heif *.bmp *.ico"),
+            ("Vídeos", "*.mp4 *.mkv *.avi *.mov *.wmv *.webm *.flv"),
+            ("Áudio", "*.mp3 *.wav *.m4a *.aac *.flac *.ogg"),
+            ("Imagens", "*.png *.jpg *.jpeg *.webp *.heic *.heif *.bmp *.ico"),
+            ("Todos os Ficheiros", "*.*")
+        ]
+        filenames = filedialog.askopenfilenames(filetypes=filetypes)
+        if filenames:
+            self.conv_files = list(filenames)
+            # Use first file for display and processing
+            self.conv_file_var.set(self.conv_files[0])
+            self._update_conv_file_info(self.conv_files[0])
+            # Update label to show count if multiple
+            count = len(self.conv_files)
+            if count > 1:
+                self.conv_file_label.config(text=f"{count} ficheiros selecionados")
+            else:
+                # Single file info already set by _update_conv_file_info
+                pass
+
+    def _update_conv_file_info(self, filename):
+        ext = os.path.splitext(filename)[1].lower()
+        size_bytes = os.path.getsize(filename)
+        size_mb = size_bytes / (1024 * 1024)
+        
+        # Mapeamento do tipo de arquivo para definir formatos de saída
+        audio_exts = [".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg"]
+        video_exts = [".mp4", ".mkv", ".avi", ".mov", ".wmv", ".webm", ".flv"]
+        image_exts = [".png", ".jpg", ".jpeg", ".webp", ".heic", ".heif", ".bmp", ".ico"]
+        
+        file_type = "Desconhecido"
+        target_formats = []
+        
+        if ext in audio_exts:
+            file_type = "Áudio"
+            target_formats = ["MP3", "WAV", "AAC", "FLAC", "OGG"]
+        elif ext in video_exts:
+            file_type = "Vídeo"
+            # Pode converter para vídeo ou extrair áudio!
+            target_formats = ["MP4", "MKV", "AVI", "WEBM", "MP3", "WAV", "AAC"]
+        elif ext in image_exts:
+            file_type = "Imagem"
+            target_formats = ["JPG", "PNG", "WEBP", "ICO", "BMP"]
+            
+        basename = os.path.basename(filename)
+        self.conv_file_label.config(
+            text=f"📄 Nome: {basename}\n"
+                 f"⚙️ Tipo: {file_type} ({ext.upper()})\n"
+                 f"💾 Tamanho: {size_mb:.2f} MB",
+            fg=C["text"]
+        )
+        
+        # Filtra os formatos disponíveis para não mostrar o mesmo formato de entrada
+        current_fmt_upper = ext.replace(".", "").upper()
+        if current_fmt_upper == "JPEG":
+            current_fmt_upper = "JPG"
+        if current_fmt_upper == "HEIF":
+            current_fmt_upper = "HEIC"
+            
+        filtered_formats = [f for f in target_formats if f != current_fmt_upper]
+        
+        self.conv_fmt_menu.config(values=filtered_formats)
+        if filtered_formats:
+            self.conv_format_var.set(filtered_formats[0])
+        else:
+            self.conv_format_var.set("")
+
+    def _switch_tab(self, tab):
+        if tab == "downloader":
+            self.converter_page.pack_forget()
+            self.downloader_page.pack(fill="both", expand=True, padx=12, pady=12)
+            self.tab_downloader_btn.config(bg=C["accent"], fg="#ffffff")
+            self.tab_converter_btn.config(bg=C["surface2"], fg=C["text_dim"])
+        elif tab == "converter":
+            self.downloader_page.pack_forget()
+            self.converter_page.pack(fill="both", expand=True)
+            self.tab_downloader_btn.config(bg=C["surface2"], fg=C["text_dim"])
+            self.tab_converter_btn.config(bg=C["accent"], fg="#ffffff")
+
+    def _conv_btn_hover_enter(self):
+        if self.is_converting:
+            self.conv_btn.config(bg="#dc2626")  # Vermelho de cancelamento
+        else:
+            self.conv_btn.config(bg=C["accent2"])
+
+    def _conv_btn_hover_leave(self):
+        if self.is_converting:
+            self.conv_btn.config(bg=C["error"])
+        else:
+            self.conv_btn.config(bg=C["accent"])
+
+    def _start_conversion(self):
+        if self.is_converting:
+            self._cancel_conversion()
+            return
+
+        # Determine list of files to convert
+        files = getattr(self, 'conv_files', None)
+        if not files:
+            # Fallback to single file variable
+            single_path = self.conv_file_var.get()
+            if not single_path:
+                messagebox.showwarning("Ficheiro em falta", "Seleciona um ficheiro válido para converter.")
+                return
+            files = [single_path]
+        else:
+            if not files:
+                messagebox.showwarning("Ficheiro em falta", "Seleciona pelo menos um ficheiro para converter.")
+                return
+
+        target_fmt = self.conv_format_var.get()
+        if not target_fmt:
+            messagebox.showwarning("Formato em falta", "Seleciona o formato de destino.")
+            return
+
+        # Prepare output directory
+        output_dir = self.download_path.get()
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Start batch conversion in a thread
+        self.is_converting = True
+        self.conv_btn.config(text="■  CANCELAR", bg=C["error"])
+        self.progress_var.set(0)
+        self.open_folder_btn.pack_forget()
+
+        self.conv_thread = threading.Thread(
+            target=self._run_batch_conversion,
+            args=(files, target_fmt),
+            daemon=True
+        )
+        self.conv_thread.start()
+
+    def _run_batch_conversion(self, files, target_fmt):
+        for input_path in files:
+            basename = os.path.basename(input_path)
+            name_without_ext = os.path.splitext(basename)[0]
+            output_ext = target_fmt.lower()
+            output_path = os.path.join(self.download_path.get(), f"{name_without_ext}.{output_ext}")
+            # Check replace prompt for each file
+            if os.path.exists(output_path):
+                if not messagebox.askyesno("Substituir ficheiro?", f"O ficheiro já existe:\n{output_path}\n\nPretendes substituir?"):
+                    continue
+            # Run conversion for this file
+            self._run_conversion(input_path, output_path, target_fmt)
+        # After batch completed, reset UI state
+        self.root.after(0, lambda: self._on_conversion_done(success=True, cancelled=False))
+
+    def _run_conversion(self, input_path, output_path, target_fmt):
+        ext = os.path.splitext(input_path)[1].lower()
+        image_exts = [".png", ".jpg", ".jpeg", ".webp", ".heic", ".heif", ".bmp", ".ico"]
+        
+        self._safe_status("A converter...", C["warn"])
+        self._safe_log(f"🔄 A iniciar conversão de {os.path.basename(input_path)} para {target_fmt}...", "info")
+        
+        if ext in image_exts:
+            # Conversão de imagem (Pillow + pillow-heif se HEIC)
+            self._safe_phase("connecting")  # Modo indeterminado
+            try:
+                # Carrega imagem
+                if ext in (".heic", ".heif") and not HEIF_AVAILABLE:
+                    raise Exception("Suporte a HEIC indisponível (pillow-heif não carregado).")
+                
+                from PIL import Image
+                img = Image.open(input_path)
+                
+                # Se for JPG/JPEG, remove canal alpha (transparência)
+                if target_fmt.upper() in ("JPG", "JPEG"):
+                    if img.mode in ("RGBA", "LA", "P"):
+                        img = img.convert("RGB")
+                
+                # Salva
+                save_fmt = target_fmt.upper()
+                if save_fmt == "JPG":
+                    save_fmt = "JPEG"
+                img.save(output_path, save_fmt)
+                
+                self._safe_log(f"✓ Conversão de imagem concluída: {os.path.basename(output_path)}", "ok")
+                self._safe_status("Conversão concluída!", C["success"])
+                self._safe_progress(100)
+                self._safe_done_conversion(success=True)
+            except Exception as e:
+                self._safe_log(f"✗ Erro na conversão de imagem: {str(e)}", "err")
+                self._safe_status("Erro na conversão", C["error"])
+                self._safe_done_conversion(success=False)
+        else:
+            # Conversão de áudio/vídeo (FFmpeg)
+            ffmpeg_path = self._get_ffmpeg_path()
+            if not ffmpeg_path:
+                self._safe_log("✗ Erro: FFmpeg não encontrado! Impossível converter áudio/vídeo.", "err")
+                self._safe_status("FFmpeg em falta", C["error"])
+                self._safe_done_conversion(success=False)
+                return
+                
+            # Verifica duração para a barra de progresso
+            total_duration = self._get_media_duration(input_path)
+            if total_duration:
+                self._safe_log(f"Duração detetada: {total_duration:.1f} segundos", "info")
+                self._safe_phase("downloading")  # Determinado
+            else:
+                self._safe_phase("connecting")  # Indeterminado se falhar obter duração
+                
+            # Constrói o comando FFmpeg
+            cmd = [ffmpeg_path, "-y", "-i", input_path]
+            
+            fmt_lower = target_fmt.lower()
+            if fmt_lower == "mp3":
+                cmd.extend(["-vn", "-c:a", "libmp3lame", "-b:a", "320k"])
+            elif fmt_lower == "wav":
+                cmd.extend(["-vn", "-c:a", "pcm_s16le"])
+            elif fmt_lower == "aac":
+                cmd.extend(["-vn", "-c:a", "aac", "-b:a", "256k"])
+            elif fmt_lower == "flac":
+                cmd.extend(["-vn", "-c:a", "flac"])
+            elif fmt_lower == "ogg":
+                cmd.extend(["-vn", "-c:a", "libvorbis", "-q:a", "6"])
+            elif fmt_lower == "mp4":
+                cmd.extend(["-c:v", "libx264", "-c:a", "aac", "-pix_fmt", "yuv420p", "-preset", "fast"])
+            elif fmt_lower == "mkv":
+                cmd.extend(["-c:v", "libx264", "-c:a", "aac", "-preset", "fast"])
+            elif fmt_lower == "avi":
+                cmd.extend(["-c:v", "libx264", "-c:a", "aac", "-preset", "fast"])
+            elif fmt_lower == "webm":
+                cmd.extend(["-c:v", "libvpx-vp9", "-c:a", "libvorbis", "-b:v", "0", "-crf", "30", "-preset", "fast"])
+                
+            cmd.append(output_path)
+            
+            try:
+                creationflags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+                self.conv_process = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    encoding='utf-8',
+                    errors='replace',
+                    creationflags=creationflags
+                )
+                
+                for line in iter(self.conv_process.stdout.readline, ''):
+                    line = line.strip()
+                    if line:
+                        # Log FFmpeg no console
+                        if "time=" in line:
+                            # Tenta parsear tempo para progresso
+                            time_match = re.search(r"time=(\d+):(\d+):(\d+\.\d+)", line)
+                            if time_match and total_duration:
+                                h, m, s = float(time_match.group(1)), float(time_match.group(2)), float(time_match.group(3))
+                                curr_sec = h * 3600 + m * 60 + s
+                                pct = min(100.0, (curr_sec / total_duration) * 100)
+                                self._safe_progress(pct)
+                                self._safe_status(f"A converter... {pct:.1f}%", C["warn"])
+                        else:
+                            # Se for aviso ou info útil
+                            if not line.startswith("frame=") and not line.startswith("size="):
+                                self._safe_log(line, "info")
+                                
+                self.conv_process.stdout.close()
+                return_code = self.conv_process.wait()
+                
+                if return_code == 0:
+                    self._safe_log(f"✓ Conversão concluída: {os.path.basename(output_path)}", "ok")
+                    self._safe_status("Conversão concluída!", C["success"])
+                    self._safe_progress(100)
+                    self._safe_done_conversion(success=True)
+                else:
+                    if self.is_converting: # se não foi cancelado
+                        self._safe_log(f"✗ Erro no FFmpeg (código {return_code})", "err")
+                        self._safe_status("Erro na conversão", C["error"])
+                        self._safe_done_conversion(success=False)
+            except Exception as e:
+                self._safe_log(f"✗ Erro inesperado no subprocesso do FFmpeg: {str(e)}", "err")
+                self._safe_status("Erro inesperado", C["error"])
+                self._safe_done_conversion(success=False)
+
+    def _cancel_conversion(self):
+        self._log("⊘ Conversão cancelada pelo utilizador.", "warn")
+        self.is_converting = False
+        if self.conv_process:
+            try:
+                self.conv_process.kill()
+            except Exception:
+                pass
+        self._safe_done_conversion(success=False, cancelled=True)
+        
+    def _safe_done_conversion(self, success=False, cancelled=False):
+        self.root.after(0, lambda: self._on_conversion_done(success, cancelled))
+        
+    def _on_conversion_done(self, success, cancelled):
+        self.is_converting = False
+        self.conv_process = None
+        self.conv_btn.config(state="normal", text="🔄  CONVERTER", bg=C["accent"])
+        self._set_phase(None)
+        
+        if cancelled:
+            self._set_status("Conversão cancelada.", C["warn"])
+        elif success:
+            self._set_status(f"Conversão concluída! Guardado em: {self.download_path.get()}", C["success"])
+            self.open_folder_btn.pack(side="right")
+            if WINSOUND_AVAILABLE:
+                try:
+                    winsound.MessageBeep(winsound.MB_ICONASTERISK)
+                except Exception:
+                    pass
+        else:
+            self._set_status("Conversão falhou.", C["error"])
+
+    def _get_media_duration(self, filepath):
+        # Encontra o ffprobe
+        app_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+        ffprobe_exe = os.path.join(app_dir, "ffprobe.exe")
+        if not os.path.exists(ffprobe_exe):
+            if shutil.which("ffprobe") is not None:
+                ffprobe_exe = "ffprobe"
+            else:
+                return None
+        
+        try:
+            creationflags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+            cmd = [ffprobe_exe, "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", filepath]
+            res = subprocess.run(cmd, capture_output=True, text=True, creationflags=creationflags, timeout=5)
+            return float(res.stdout.strip())
+        except Exception:
+            return None
+
+    def _get_ffmpeg_path(self):
+        if shutil.which("ffmpeg") is not None:
+            return "ffmpeg"
+        app_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+        local_ffmpeg = os.path.join(app_dir, "ffmpeg.exe")
+        if os.path.exists(local_ffmpeg):
+            return local_ffmpeg
+        return None
+
+
 
         # Inicializa o log com a visibilidade salva
 
@@ -1164,6 +1636,11 @@ class PulsarUI:
             self._log("⚠  FFmpeg NÃO ENCONTRADO! Audio/MP4 não vai juntar.", "warn")
         else:
             self._log("FFmpeg pronto.", "ok")
+
+        if not HEIF_AVAILABLE:
+            self._log("⚠  pillow-heif não encontrado! Conversões de HEIC (iPhone) não irão funcionar.", "warn")
+        else:
+            self._log("pillow-heif (suporte HEIC do iPhone) pronto.", "ok")
 
     def _is_ffmpeg_installed(self):
         """Verifica a presença da dependência FFmpeg no PATH ou localmente."""
