@@ -387,9 +387,10 @@ class DownloadEngine:
 class PulsarUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("SlayerHub")
+        self.root.title("SlayerDownloader v3.0")
         self.root.geometry("800x800")
-        self.root.minsize(800, 800)
+        # Removed fixed minsize; will set dynamically after UI is built
+        # self.root.minsize(800, 800)
         self.root.configure(bg=C["bg"])
 
         # Inicialização dos gerenciadores de configuração, fila e downloads
@@ -435,6 +436,11 @@ class PulsarUI:
 
         self._build_ui()
         self._check_dependencies()
+        # After UI is fully constructed, enforce a minimum window size
+        self.root.update_idletasks()
+        min_w = self.root.winfo_reqwidth()
+        min_h = self.root.winfo_reqheight()
+        self.root.minsize(min_w, min_h)
 
         # Detecção de foco na janela para colagem automática
         self.root.bind("<FocusIn>", self._on_focus_in)
@@ -470,7 +476,7 @@ class PulsarUI:
                  fg=C["accent"], bg=C["bg"]).pack(side="left")
         tk.Label(header, text="HUB", font=("Calibri", 22),
                  fg=C["text_dim"], bg=C["bg"]).pack(side="left", padx=(6, 0))
-        tk.Label(header, text="v2.1.0", font=F_SMALL,
+        tk.Label(header, text="v3.0", font=F_SMALL,
                  fg=C["text_muted"], bg=C["bg"]).pack(side="left", padx=(10, 0), pady=(8, 0))
 
         # Botão para atualização do yt-dlp local
@@ -587,6 +593,28 @@ class PulsarUI:
     def _build_downloader_tab(self):
         main = self.downloader_page
 
+        # ── Botão principal de ação — packed FIRST so tkinter reserves its space ──
+        btn_frame = tk.Frame(main, bg=C["bg"], pady=8)
+        btn_frame.pack(fill="x", side="bottom")
+
+        self.dl_btn = tk.Button(btn_frame,
+                                text="▼  DESCARREGAR",
+                                font=("Segoe UI", 14, "bold"),
+                                bg=C["accent"], fg="#ffffff",
+                                activebackground=C["accent2"],
+                                activeforeground="#ffffff",
+                                relief="flat", bd=0,
+                                cursor="hand2",
+                                command=self._start_download,
+                                padx=24, pady=8)
+        self.dl_btn.pack(fill="x")
+
+        # Comportamento de foco/hover para o botão principal
+        self.dl_btn.bind("<Enter>", lambda e: self._btn_hover_enter())
+        self.dl_btn.bind("<Leave>", lambda e: self._btn_hover_leave())
+
+        # ── Conteúdo (packed AFTER the button, fills remaining space) ──
+
         # Campo de entrada da URL
         self._label(main, "Link do vídeo")
         url_row = tk.Frame(main, bg=C["bg"])
@@ -681,7 +709,7 @@ class PulsarUI:
                                     highlightbackground=C["border"])
         self.queue_frame.pack(fill="x", pady=(4, 0))
         
-        self.queue_canvas = tk.Canvas(self.queue_frame, bg=C["surface"], highlightthickness=0, height=80)
+        self.queue_canvas = tk.Canvas(self.queue_frame, bg=C["surface"], highlightthickness=0, height=60)
         self.queue_container = tk.Frame(self.queue_canvas, bg=C["surface"])
         self.queue_window = self.queue_canvas.create_window((0, 0), window=self.queue_container, anchor="nw")
         
@@ -710,29 +738,6 @@ class PulsarUI:
                              cursor="hand2")
         clear_btn.pack(anchor="e")
         clear_btn.bind("<Button-1>", lambda e: self._clear_queue())
-
-        # Botão principal de ação do Downloader
-        btn_frame = tk.Frame(main, bg=C["bg"], pady=12)
-        btn_frame.pack(fill="x", side="bottom")
-        # Ensure the download button stays visible by preventing the window from being resized below needed size
-        self.root.update_idletasks()
-        self.root.minsize(self.root.winfo_width(), self.root.winfo_height())
-
-        self.dl_btn = tk.Button(btn_frame,
-                                text="▼  DESCARREGAR",
-                                font=("Segoe UI", 16, "bold"),
-                                bg=C["accent"], fg="#ffffff",
-                                activebackground=C["accent2"],
-                                activeforeground="#ffffff",
-                                relief="flat", bd=0,
-                                cursor="hand2",
-                                command=self._start_download,
-                                padx=24, pady=10)
-        self.dl_btn.pack(fill="x")
-
-        # Comportamento de foco/hover para o botão principal
-        self.dl_btn.bind("<Enter>", lambda e: self._btn_hover_enter())
-        self.dl_btn.bind("<Leave>", lambda e: self._btn_hover_leave())
 
     def _build_converter_tab(self):
         main = self.converter_page

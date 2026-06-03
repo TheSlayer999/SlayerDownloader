@@ -5,7 +5,7 @@ echo ===================================================
 echo.
 
 echo 1. Instalando dependencias...
-python -m pip install pypiwin32 pyinstaller Pillow
+py -m pip install pypiwin32 pyinstaller Pillow pillow-heif yt-dlp
 
 echo.
 echo 2. A verificar FFmpeg...
@@ -52,7 +52,7 @@ if exist "ffmpeg.exe" (
 
 echo.
 echo 3. A compilar o downloader.py num EXE (isso pode demorar uns minutos)...
-python -m PyInstaller --noconfirm --onefile --windowed --name "SlayerDownloader" --icon "assets\icon.ico" --add-data "assets;assets" "downloader.py"
+py -m PyInstaller --noconfirm --onefile --windowed --name "SlayerDownloader" --icon "assets\icon.ico" --add-data "assets;assets" --hidden-import yt_dlp --hidden-import pillow_heif "downloader.py"
 
 echo.
 echo 4. A criar pasta final "SlayerDownloader"...
