@@ -903,7 +903,7 @@ class PulsarUI:
             self.tab_converter_btn.config(bg=C["surface2"], fg=C["text_dim"])
         elif tab == "converter":
             self.downloader_page.pack_forget()
-            self.converter_page.pack(fill="both", expand=True)
+            self.converter_page.pack(fill="both", expand=True, padx=12, pady=12)
             self.tab_downloader_btn.config(bg=C["surface2"], fg=C["text_dim"])
             self.tab_converter_btn.config(bg=C["accent"], fg="#ffffff")
 
