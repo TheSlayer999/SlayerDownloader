@@ -387,7 +387,7 @@ class DownloadEngine:
 class PulsarUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("SlayerDownloader v3.0")
+        self.root.title("SlayerHub v3.0")
         self.root.geometry("800x800")
         # Removed fixed minsize; will set dynamically after UI is built
         # self.root.minsize(800, 800)
