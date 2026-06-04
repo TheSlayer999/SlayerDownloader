@@ -53,8 +53,8 @@ Qualquer site suportado pelo **yt-dlp** funciona, incluindo:
 ### Opção 1 — Executável pronto (recomendado)
 
 1. Vai à secção **[Releases](https://github.com/TheSlayer999/SlayerDownloader/releases)** do repositório.
-2. Descarrega o ficheiro `SlayerDownloader.rar` da versão mais recente.
-3. Extrai o `.rar` e abre `SlayerDownloader.exe`.
+2. Descarrega o ficheiro `SlayerHub.zip` da versão mais recente.
+3. Extrai o `.rar` e abre `SlayerHub.exe`.
 
 > ⚠️ O Windows pode bloquear o `.exe` por não estar assinado digitalmente. Clica em **"Mais informações" → "Executar mesmo assim"**.
 
