@@ -21,12 +21,8 @@
 - [Instalação](#instalação)
 - [Compilar para .exe](#compilar-para-exe)
 - [Para Programadores](#para-programadores)
-- [Configuração](#configuração)
-- [Roadmap](#roadmap)
 - [Changelog](#changelog)
 - [Licença](#licença)
-- [Contribuições](#contribuições)
-- [Contacto](#contacto)
 
 ---
 
@@ -168,23 +164,12 @@ O que faz automaticamente:
 
 ```
 SlayerHub/
-├── downloader.py              # Código principal — UI (Tkinter) + lógica de download/conversão
-├── requirements.txt           # Dependências Python
-├── build.bat                  # Script de compilação (PyInstaller)
-├── SlayerHub.spec             # Spec do PyInstaller
-├── release-notes-v3.0.1.txt   # Notas da versão atual
-├── LICENSE                    # Licença MIT
-├── CLAUDE.md                  # Regras de contexto para Claude Code
-├── config.json                # Configurações do utilizador (auto-gerado)
+├── downloader.py           # Código principal — UI (Tkinter) + lógica de download/conversão
+├── requirements.txt        # Dependências Python
+├── build.bat               # Script de compilação (PyInstaller)
 ├── assets/
-│   ├── icon.ico               # Ícone da aplicação
-│   ├── icon.jpg               # Ícone alternativo
-│   ├── DownloaderTela.png     # Screenshot da aba Downloader
-│   └── ConversorTela.png      # Screenshot da aba Conversor
-├── build/                     # Artefactos temporários de compilação (gitignored)
-├── dist/                      # Executável compilado (gitignored)
-├── old versions/              # Versões anteriores (gitignored)
-└── .claude/                   # Configurações do Claude Code
+│   └── icon.ico            # Ícone da aplicação
+└── LICENSE                 # Licença MIT
 ```
 
 ### Arquitetura Interna
@@ -200,31 +185,6 @@ O código está organizado em 4 classes principais, dentro de um único ficheiro
 
 ---
 
-## ⚙️ Configuração
-
-As preferências são guardadas automaticamente em `config.json`:
-
-```json
-{
-  "download_path": "C:/Users/utilizador/Downloads",
-  "format": "🎵  Só Áudio (MP3)",
-  "show_log": false
-}
-```
-
----
-
-## 🗺️ Roadmap
-
-- [ ] Tema claro/escuro selecionável
-- [ ] Download de playlists completas
-- [ ] Suporte a legendas
-- [ ] Localização EN/PT
-- [ ] Modo portátil (config na mesma pasta)
-- [ ] Instalador MSI / winget
-
----
-
 ## 📋 Changelog
 
 As notas de versão detalhadas estão em [`release-notes-v3.0.1.txt`](release-notes-v3.0.1.txt).
@@ -237,17 +197,3 @@ Consulta todas as versões na página [Releases do GitHub](https://github.com/Th
 
 Este projeto está licenciado sob a **MIT License** — vê o ficheiro [`LICENSE`](LICENSE) para mais detalhes.
 
----
-
-## 🤝 Contribuições
-
-Contribuições são bem-vindas! Abre uma *issue* para relatar bugs ou sugerir funcionalidades, ou submete um *pull request* diretamente.
-
-Se encontrares problemas com downloads, verifica primeiro se o **yt-dlp** está atualizado — há um botão na app para isso (cabeçalho → "Atualizar yt-dlp").
-
----
-
-## 📞 Contacto
-
-- **GitHub:** https://github.com/TheSlayer999/SlayerHub
-- **Autor:** TheSlayer999
