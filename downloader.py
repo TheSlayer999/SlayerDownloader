@@ -1,5 +1,5 @@
 """
-Slayer Downloader
+SlayerHub v3.0.1
 
 Interface gráfica (Tkinter) para download de vídeos e áudios de plataformas
 como YouTube, TikTok, Twitter e Instagram. Suporta downloads individuais
@@ -16,7 +16,7 @@ import sys
 import re
 import shutil
 import time
-from datetime import datetime
+import argparse
 
 # Suporte a notificações sonoras nativas do Windows
 try:
@@ -64,6 +64,9 @@ C = {
     "success":   "#34d399",   # Indicador de sucesso (verde)
     "warn":      "#fbbf24",   # Indicador de aviso ou atenção (amarelo)
     "error":     "#f87171",   # Indicador de erro ou falha (vermelho)
+    "cancel":    "#dc2626",   # Botão de cancelamento (vermelho escuro)
+    "remove_hover": "#ff8080", # Hover do botão remover na fila
+    "on_accent": "#ffffff",   # Texto sobre fundo accent
     "entry_bg":  "#0e1629",   # Fundo dos campos de entrada de texto
 }
 
@@ -387,7 +390,7 @@ class DownloadEngine:
 class PulsarUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("SlayerHub v3.0")
+        self.root.title("SlayerHub v3.0.1")
         self.root.geometry("800x800")
         # Removed fixed minsize; will set dynamically after UI is built
         # self.root.minsize(800, 800)
@@ -476,7 +479,7 @@ class PulsarUI:
                  fg=C["accent"], bg=C["bg"]).pack(side="left")
         tk.Label(header, text="HUB", font=("Calibri", 22),
                  fg=C["text_dim"], bg=C["bg"]).pack(side="left", padx=(6, 0))
-        tk.Label(header, text="v3.0", font=F_SMALL,
+        tk.Label(header, text="v3.0.1", font=F_SMALL,
                  fg=C["text_muted"], bg=C["bg"]).pack(side="left", padx=(10, 0), pady=(8, 0))
 
         # Botão para atualização do yt-dlp local
@@ -496,13 +499,13 @@ class PulsarUI:
         self.nav_frame.pack(fill="x", padx=28, pady=(4, 8))
 
         self.tab_downloader_btn = tk.Button(self.nav_frame, text="📥 Downloader", font=F_BOLD,
-                                            bg=C["accent"], fg="#ffffff", activebackground=C["accent2"], activeforeground="#ffffff",
+                                            bg=C["accent"], fg=C["on_accent"], activebackground=C["accent2"], activeforeground=C["on_accent"],
                                             relief="flat", bd=0, cursor="hand2", padx=20, pady=8,
                                             command=lambda: self._switch_tab("downloader"))
         self.tab_downloader_btn.pack(side="left", padx=(0, 10))
 
         self.tab_converter_btn = tk.Button(self.nav_frame, text="🔄 Conversor", font=F_BOLD,
-                                           bg=C["surface2"], fg=C["text_dim"], activebackground=C["accent"], activeforeground="#ffffff",
+                                           bg=C["surface2"], fg=C["text_dim"], activebackground=C["accent"], activeforeground=C["on_accent"],
                                            relief="flat", bd=0, cursor="hand2", padx=20, pady=8,
                                            command=lambda: self._switch_tab("converter"))
         self.tab_converter_btn.pack(side="left")
@@ -600,9 +603,9 @@ class PulsarUI:
         self.dl_btn = tk.Button(btn_frame,
                                 text="▼  DESCARREGAR",
                                 font=("Segoe UI", 14, "bold"),
-                                bg=C["accent"], fg="#ffffff",
+                                bg=C["accent"], fg=C["on_accent"],
                                 activebackground=C["accent2"],
-                                activeforeground="#ffffff",
+                                activeforeground=C["on_accent"],
                                 relief="flat", bd=0,
                                 cursor="hand2",
                                 command=self._start_download,
@@ -813,9 +816,9 @@ class PulsarUI:
         self.conv_btn = tk.Button(btn_frame,
                                   text="🔄  CONVERTER",
                                   font=("Segoe UI", 16, "bold"),
-                                  bg=C["accent"], fg="#ffffff",
+                                  bg=C["accent"], fg=C["on_accent"],
                                   activebackground=C["accent2"],
-                                  activeforeground="#ffffff",
+                                  activeforeground=C["on_accent"],
                                   relief="flat", bd=0,
                                   cursor="hand2",
                                   command=self._start_conversion,
@@ -899,17 +902,17 @@ class PulsarUI:
         if tab == "downloader":
             self.converter_page.pack_forget()
             self.downloader_page.pack(fill="both", expand=True, padx=12, pady=12)
-            self.tab_downloader_btn.config(bg=C["accent"], fg="#ffffff")
+            self.tab_downloader_btn.config(bg=C["accent"], fg=C["on_accent"])
             self.tab_converter_btn.config(bg=C["surface2"], fg=C["text_dim"])
         elif tab == "converter":
             self.downloader_page.pack_forget()
             self.converter_page.pack(fill="both", expand=True, padx=12, pady=12)
             self.tab_downloader_btn.config(bg=C["surface2"], fg=C["text_dim"])
-            self.tab_converter_btn.config(bg=C["accent"], fg="#ffffff")
+            self.tab_converter_btn.config(bg=C["accent"], fg=C["on_accent"])
 
     def _conv_btn_hover_enter(self):
         if self.is_converting:
-            self.conv_btn.config(bg="#dc2626")  # Vermelho de cancelamento
+            self.conv_btn.config(bg=C["cancel"])  # Vermelho de cancelamento
         else:
             self.conv_btn.config(bg=C["accent2"])
 
@@ -1161,10 +1164,6 @@ class PulsarUI:
             return local_ffmpeg
         return None
 
-
-
-        # Inicializa o log com a visibilidade salva
-
     def _style_ttk(self):
         s = ttk.Style()
         s.theme_use("clam")
@@ -1231,7 +1230,7 @@ class PulsarUI:
     # --- Efeitos Visuais do Botão Principal ---
     def _btn_hover_enter(self):
         if self.engine.is_downloading:
-            self.dl_btn.config(bg="#dc2626")  # Cor de destaque de interrupção (vermelho)
+            self.dl_btn.config(bg=C["cancel"])  # Cor de destaque de interrupção (vermelho)
         else:
             self.dl_btn.config(bg=C["accent2"])
 
@@ -1377,18 +1376,16 @@ class PulsarUI:
                     img = Image.open(io.BytesIO(data))
                     img = img.resize((120, 68), Image.LANCZOS)
                     thumb_img = ImageTk.PhotoImage(img)
-                except Exception:
-                    pass
-
-            # Segunda validação de concorrência antes de pintar na tela
+                except Exception as e:
+                    self._safe_log(f"⚠ Miniatura indisponível: {str(e)[:80]}", "warn")
             if job_id != self._thumbnail_job:
                 return
 
             # Envia as atualizações visuais para execução na thread principal
             self.root.after(0, lambda: self._show_thumbnail(title, channel, dur_str, thumb_img))
 
-        except Exception:
-            # Oculta a miniatura em caso de falha de conexão ou erro do yt-dlp
+        except Exception as e:
+            self._safe_log(f"⚠ Erro ao obter info do vídeo: {str(e)[:80]}", "warn")
             if job_id == self._thumbnail_job:
                 self.root.after(0, self._hide_thumbnail)
 
@@ -1559,7 +1556,13 @@ class PulsarUI:
             
         items = self.queue.items()
         self.queue_label.config(text=f"Fila  ({len(items)} itens)")
-        
+
+        if not items:
+            empty_lbl = tk.Label(self.queue_container, text="Nenhum link na fila.\nAdicione URLs para começar.",
+                                 font=F_SMALL, bg=C["surface"], fg=C["text_muted"], anchor="center", justify="center")
+            empty_lbl.pack(fill="both", expand=True, pady=16)
+            return
+
         for idx, item in enumerate(items):
             url = item["url"]
             display = url[:65] + "..." if len(url) > 65 else url
@@ -1579,7 +1582,7 @@ class PulsarUI:
             def on_enter(e, r=row_frame, l=lbl, b=btn_rm):
                 r.config(bg=C["border"])
                 l.config(bg=C["border"], fg=C["text"])
-                b.config(bg=C["border"], fg="#ff8080")
+                b.config(bg=C["border"], fg=C["remove_hover"])
                 b.pack(side="right", padx=(0, 8))
             
             def on_leave(e, r=row_frame, l=lbl, b=btn_rm):
@@ -1836,9 +1839,12 @@ if __name__ == "__main__":
     import multiprocessing
     multiprocessing.freeze_support()
 
-    # Trata as invocações de multiprocessamento nativas do yt-dlp no executável compilation
-    if len(sys.argv) > 1 and sys.argv[1] == "--run-yt-dlp":
-        sys.argv.pop(1)  # Remove o parâmetro interno para evitar conflitos no yt-dlp
+    parser = argparse.ArgumentParser(description="SlayerHub - Downloader e Conversor de media")
+    parser.add_argument("--run-yt-dlp", action="store_true", help="Executar yt-dlp diretamente (uso interno)")
+    args, remaining = parser.parse_known_args()
+
+    if args.run_yt_dlp:
+        sys.argv = [sys.argv[0]] + remaining  # Remove o parâmetro interno para evitar conflitos
         import yt_dlp
         sys.exit(yt_dlp.main())
 
