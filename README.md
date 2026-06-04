@@ -187,9 +187,7 @@ O código está organizado em 4 classes principais, dentro de um único ficheiro
 
 ## 📋 Changelog
 
-As notas de versão detalhadas estão em [`release-notes-v3.0.1.txt`](release-notes-v3.0.1.txt).
-
-Consulta todas as versões na página [Releases do GitHub](https://github.com/TheSlayer999/SlayerHub/releases).
+Consulta todas as notas de versões detalhadas na página [Releases do GitHub](https://github.com/TheSlayer999/SlayerHub/releases).
 
 ---
 
