@@ -1,3 +1,4 @@
 yt-dlp>=2024.0.0
 Pillow>=10.0.0
 pillow-heif>=0.13.0
+tkmacosx; sys_platform == 'darwin'
