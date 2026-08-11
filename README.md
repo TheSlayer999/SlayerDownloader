@@ -3,10 +3,10 @@
 [![GitHub release](https://img.shields.io/github/v/release/TheSlayer999/SlayerHub?style=flat-square)](https://github.com/TheSlayer999/SlayerHub/releases)
 [![Python](https://img.shields.io/badge/Python-3.10+-blue?style=flat-square)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
-[![Platform](https://img.shields.io/badge/Platform-Windows-0078d4?style=flat-square)](https://github.com/TheSlayer999/SlayerHub)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS-0078d4?style=flat-square)](https://github.com/TheSlayer999/SlayerHub)
 [![yt-dlp](https://img.shields.io/badge/yt--dlp-powered-brightgreen?style=flat-square)](https://github.com/yt-dlp/yt-dlp)
 
-**SlayerHub** é uma aplicação desktop para Windows, construída em Python com Tkinter, que permite descarregar vídeos e áudio de dezenas de plataformas online e converter ficheiros de media entre formatos — tudo com uma interface gráfica limpa e moderna.
+**SlayerHub** é uma aplicação desktop multiplataforma (Windows e macOS), construída em Python com Tkinter, que permite descarregar vídeos e áudio de dezenas de plataformas online e converter ficheiros de media entre formatos — tudo com uma interface gráfica limpa e totalmente otimizada.
 
 ---
 
@@ -91,16 +91,18 @@ A app deteta automaticamente a plataforma ao colar o link e apresenta a pré-vis
 ### Opção 1 — Executável pronto (recomendado)
 
 1. Vai à secção **[Releases](https://github.com/TheSlayer999/SlayerHub/releases)** do repositório.
-2. Descarrega o ficheiro `SlayerHub.zip` da versão mais recente.
-3. Extrai o `.zip` e abre `SlayerHub.exe`.
+2. Descarrega o ficheiro referente ao teu sistema: `SlayerHubWin.zip` (Windows) ou `SlayerHubMac.zip` (Mac).
+3. **No Windows:** Extrai o ficheiro `.zip` e abre `SlayerHub.exe`.
+   **No Mac:** Extrai o ficheiro `.zip` e abre `SlayerHub.app`.
 
-> ⚠️ O Windows pode bloquear o `.exe` por não estar assinado digitalmente. Clica em **"Mais informações" → "Executar mesmo assim"**.
+> ⚠️ **Windows:** O Windows pode bloquear o `.exe` por não estar assinado. Clica em **"Mais informações" → "Executar mesmo assim"**.
+> 🍎 **macOS:** O Mac pode bloquear o `.app`. Vai a **Definições de Sistema → Privacidade e Segurança** e clica em **"Abrir na mesma"**.
 
-A pasta descomprimida contém:
+A pasta final contém apenas o executável da aplicação:
 
 ```
 SlayerHub/
-└── SlayerHub.exe   # Aplicação completa (tudo incluído)
+└── SlayerHub.exe / SlayerHub.app   # Aplicação completa
 ```
 
 > O FFmpeg é descarregado automaticamente pela app na primeira vez que for necessário.
@@ -118,20 +120,25 @@ python downloader.py
 
 ---
 
-## 🔨 Compilar para .exe
+## 🔨 Compilar (Para Windows e Mac)
 
-O script `build.bat` automatiza todo o processo:
-
+**Para Windows (.exe):**
+O script `build.bat` automatiza todo o processo.
 ```bat
 build.bat
 ```
 
-O que faz automaticamente:
-1. Instala todas as dependências Python (`pyinstaller`, `Pillow`, `pillow-heif`, `yt-dlp`)
-2. Compila o `downloader.py` num único `.exe` com PyInstaller
-3. Cria a pasta `SlayerHub/` com o executável pronto a distribuir
+**Para macOS (.app):**
+No terminal do Mac, corre o PyInstaller diretamente (garante que instalaste o `requirements.txt`):
+```bash
+pyinstaller --noconfirm --noconsole --name "SlayerHub" --icon "assets/icon.ico" downloader.py
+```
 
-> O FFmpeg **não** é incluído no pacote — a app descarrega-o automaticamente na primeira execução, se necessário. A pasta final pode ser comprimida em `.zip` ou `.rar` e partilhada diretamente.
+O que acontece automaticamente:
+1. Compila o `downloader.py` num executável ou `.app` único com PyInstaller.
+2. Cria os resultados na pasta `dist/` prontos a distribuir.
+
+> O FFmpeg **não** é incluído no pacote — a app descarrega-o automaticamente para o formato certo (Windows ou Mac) na primeira execução, se necessário. A pasta final pode ser partilhada diretamente.
 
 ---
 

@@ -18,6 +18,14 @@ import shutil
 import time
 import argparse
 
+if sys.platform == 'darwin':
+    try:
+        from tkmacosx import Button as tkButton
+    except ImportError:
+        tkButton = tk.Button
+else:
+    tkButton = tk.Button
+
 # Suporte a notificações sonoras nativas do Windows
 try:
     import winsound
@@ -27,6 +35,7 @@ except ImportError:
 
 # Suporte a pré-visualização de miniaturas (Pillow)
 try:
+# pyrefly: ignore [missing-import]
     from PIL import Image, ImageTk
     import urllib.request
     import io
@@ -483,7 +492,7 @@ class PulsarUI:
                  fg=C["text_muted"], bg=C["bg"]).pack(side="left", padx=(10, 0), pady=(8, 0))
 
         # Botão para atualização do yt-dlp local
-        self.update_btn = tk.Button(header, text="🔄 Atualizar yt-dlp",
+        self.update_btn = tkButton(header, text="🔄 Atualizar yt-dlp",
                                      font=F_SMALL,
                                      bg=C["surface2"], fg=C["text_muted"],
                                      activebackground=C["accent"], activeforeground="#fff",
@@ -498,13 +507,13 @@ class PulsarUI:
         self.nav_frame = tk.Frame(self.root, bg=C["bg"])
         self.nav_frame.pack(fill="x", padx=28, pady=(4, 8))
 
-        self.tab_downloader_btn = tk.Button(self.nav_frame, text="📥 Downloader", font=F_BOLD,
+        self.tab_downloader_btn = tkButton(self.nav_frame, text="📥 Downloader", font=F_BOLD,
                                             bg=C["accent"], fg=C["on_accent"], activebackground=C["accent2"], activeforeground=C["on_accent"],
                                             relief="flat", bd=0, cursor="hand2", padx=20, pady=8,
                                             command=lambda: self._switch_tab("downloader"))
         self.tab_downloader_btn.pack(side="left", padx=(0, 10))
 
-        self.tab_converter_btn = tk.Button(self.nav_frame, text="🔄 Conversor", font=F_BOLD,
+        self.tab_converter_btn = tkButton(self.nav_frame, text="🔄 Conversor", font=F_BOLD,
                                            bg=C["surface2"], fg=C["text_dim"], activebackground=C["accent"], activeforeground=C["on_accent"],
                                            relief="flat", bd=0, cursor="hand2", padx=20, pady=8,
                                            command=lambda: self._switch_tab("converter"))
@@ -535,7 +544,7 @@ class PulsarUI:
                                      anchor="w")
         self.status_label.pack(side="left", fill="x", expand=True)
 
-        self.open_folder_btn = tk.Button(status_row, text="📂 Abrir pasta",
+        self.open_folder_btn = tkButton(status_row, text="📂 Abrir pasta",
                                           font=F_SMALL,
                                           bg=C["surface2"], fg=C["success"],
                                           activebackground=C["accent"], activeforeground="#fff",
@@ -600,7 +609,7 @@ class PulsarUI:
         btn_frame = tk.Frame(main, bg=C["bg"], pady=8)
         btn_frame.pack(fill="x", side="bottom")
 
-        self.dl_btn = tk.Button(btn_frame,
+        self.dl_btn = tkButton(btn_frame,
                                 text="▼  DESCARREGAR",
                                 font=("Segoe UI", 14, "bold"),
                                 bg=C["accent"], fg=C["on_accent"],
@@ -813,7 +822,7 @@ class PulsarUI:
         btn_frame = tk.Frame(main, bg=C["bg"], pady=12)
         btn_frame.pack(fill="x", side="bottom")
 
-        self.conv_btn = tk.Button(btn_frame,
+        self.conv_btn = tkButton(btn_frame,
                                   text="🔄  CONVERTER",
                                   font=("Segoe UI", 16, "bold"),
                                   bg=C["accent"], fg=C["on_accent"],
@@ -1215,7 +1224,7 @@ class PulsarUI:
     def _btn(self, parent, text, cmd, color=None, fg=None):
         color = color or C["surface2"]
         fg    = fg or C["text_dim"]
-        b = tk.Button(parent, text=text, font=F_BOLD,
+        b = tkButton(parent, text=text, font=F_BOLD,
                       bg=color, fg=fg,
                       activebackground=C["accent"], activeforeground="#fff",
                       relief="flat", bd=0, cursor="hand2",
@@ -1655,11 +1664,12 @@ class PulsarUI:
         if shutil.which("ffmpeg") is not None:
             return True
         app_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
-        local_ffmpeg = os.path.join(app_dir, "ffmpeg.exe")
+        ext = ".exe" if os.name == 'nt' else ""
+        local_ffmpeg = os.path.join(app_dir, f"ffmpeg{ext}")
         return os.path.exists(local_ffmpeg)
 
     def _download_ffmpeg(self):
-        """Faz o download e instalação automatizada do pacote FFmpeg compilado para Windows."""
+        """Faz o download e instalação automatizada do pacote FFmpeg."""
         self.dl_btn.config(state="disabled")
         self._set_status("A descarregar FFmpeg (cerca de 100MB)...", C["warn"])
         self.prog_bar.config(mode="indeterminate")
@@ -1672,29 +1682,39 @@ class PulsarUI:
                 import zipfile
                 
                 app_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
-                url = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
+                
+                if os.name == 'nt':
+                    url = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
+                elif sys.platform == 'darwin':
+                    url = "https://evermeet.cx/ffmpeg/getrelease/zip"
+                else:
+                    raise Exception("Sistema operativo não suportado para download automático.")
                 
                 # Define diretório temporário para download do instalador compactado
                 temp_zip_path = os.path.join(app_dir, "ffmpeg_temp.zip")
                 
-                self.root.after(0, lambda: self._log("📥 A descarregar FFmpeg de gyan.dev...", "info"))
+                self.root.after(0, lambda: self._log("📥 A descarregar FFmpeg...", "info"))
                 
                 # Executa requisição do arquivo compactado configurando User-Agent
                 req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
                 with urllib.request.urlopen(req, timeout=30) as response, open(temp_zip_path, 'wb') as out_file:
                     shutil.copyfileobj(response, out_file)
                 
-                self.root.after(0, lambda: self._log("📦 A extrair ffmpeg.exe...", "info"))
+                self.root.after(0, lambda: self._log("📦 A extrair ffmpeg...", "info"))
                 self.root.after(0, lambda: self._set_status("A extrair FFmpeg...", C["warn"]))
                 
-                # Extrai unicamente o executável ffmpeg.exe do arquivo compactado
+                # Extrai unicamente o executável ffmpeg do arquivo compactado
                 extracted = False
+                ext = ".exe" if os.name == 'nt' else ""
                 with zipfile.ZipFile(temp_zip_path, 'r') as zip_ref:
                     for file_info in zip_ref.infolist():
-                        if file_info.filename.endswith("bin/ffmpeg.exe"):
-                            # Grava o binário extraído no diretório principal da aplicação
-                            with zip_ref.open(file_info) as source, open(os.path.join(app_dir, "ffmpeg.exe"), "wb") as target:
+                        if (os.name == 'nt' and file_info.filename.endswith("bin/ffmpeg.exe")) or \
+                           (sys.platform == 'darwin' and file_info.filename == "ffmpeg"):
+                            ffmpeg_path = os.path.join(app_dir, f"ffmpeg{ext}")
+                            with zip_ref.open(file_info) as source, open(ffmpeg_path, "wb") as target:
                                 shutil.copyfileobj(source, target)
+                            if sys.platform == 'darwin':
+                                os.chmod(ffmpeg_path, 0o755)
                             extracted = True
                             break
                 
