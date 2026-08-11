@@ -91,9 +91,9 @@ A app deteta automaticamente a plataforma ao colar o link e apresenta a pré-vis
 ### Opção 1 — Executável pronto (recomendado)
 
 1. Vai à secção **[Releases](https://github.com/TheSlayer999/SlayerHub/releases)** do repositório.
-2. Descarrega o ficheiro referente ao teu sistema: `SlayerHubWin.zip` (Windows) ou `SlayerHubMac.zip` (Mac).
+2. Descarrega o ficheiro referente ao teu sistema: `SlayerHubWin.zip` (Windows) ou `SlayerHubMac.dmg` (Mac).
 3. **No Windows:** Extrai o ficheiro `.zip` e abre `SlayerHub.exe`.
-   **No Mac:** Extrai o ficheiro `.zip` e abre `SlayerHub.app`.
+   **No Mac:** Abre o ficheiro `.dmg` e arrasta a aplicação `SlayerHub.app` para a pasta Aplicações (ou abre-a diretamente).
 
 > ⚠️ **Windows:** O Windows pode bloquear o `.exe` por não estar assinado. Clica em **"Mais informações" → "Executar mesmo assim"**.
 > 🍎 **macOS:** O Mac pode bloquear o `.app`. Vai a **Definições de Sistema → Privacidade e Segurança** e clica em **"Abrir na mesma"**.
@@ -128,10 +128,11 @@ O script `build.bat` automatiza todo o processo.
 build.bat
 ```
 
-**Para macOS (.app):**
-No terminal do Mac, corre o PyInstaller diretamente (garante que instalaste o `requirements.txt`):
+**Para macOS (.dmg):**
+No terminal do Mac, corre o script `build_mac.sh` (garante que instalaste o `requirements.txt`):
 ```bash
-pyinstaller --noconfirm --noconsole --name "SlayerHub" --icon "assets/icon.ico" downloader.py
+chmod +x build_mac.sh
+./build_mac.sh
 ```
 
 O que acontece automaticamente:
