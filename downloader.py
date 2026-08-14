@@ -1,5 +1,5 @@
 """
-SlayerHub v3.0.1
+SlayerHub v3.1
 
 Interface gráfica (Tkinter) para download de vídeos e áudios de plataformas
 como YouTube, TikTok, Twitter e Instagram. Suporta downloads individuais
@@ -25,6 +25,16 @@ if sys.platform == 'darwin':
         tkButton = tk.Button
 else:
     tkButton = tk.Button
+
+if sys.platform == 'darwin':
+    YTDLP_FILENAME = "yt-dlp_macos"
+elif os.name == 'nt':
+    YTDLP_FILENAME = "yt-dlp.exe"
+else:
+    YTDLP_FILENAME = "yt-dlp"
+
+FFMPEG_FILENAME = "ffmpeg.exe" if os.name == 'nt' else "ffmpeg"
+FFPROBE_FILENAME = "ffprobe.exe" if os.name == 'nt' else "ffprobe"
 
 # Suporte a notificações sonoras nativas do Windows
 try:
@@ -252,7 +262,7 @@ class DownloadEngine:
 
         # Determina o caminho do executável do yt-dlp conforme o ambiente
         app_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
-        local_ytdlp = os.path.join(app_dir, "yt-dlp.exe")
+        local_ytdlp = os.path.join(app_dir, YTDLP_FILENAME)
 
         if os.path.exists(local_ytdlp):
             cmd = [local_ytdlp, "--no-warnings", "--socket-timeout", "15", "--newline"]
@@ -399,7 +409,7 @@ class DownloadEngine:
 class PulsarUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("SlayerHub v3.0.1")
+        self.root.title("SlayerHub v3.1")
         self.root.geometry("800x800")
         # Removed fixed minsize; will set dynamically after UI is built
         # self.root.minsize(800, 800)
@@ -488,7 +498,7 @@ class PulsarUI:
                  fg=C["accent"], bg=C["bg"]).pack(side="left")
         tk.Label(header, text="HUB", font=("Calibri", 22),
                  fg=C["text_dim"], bg=C["bg"]).pack(side="left", padx=(6, 0))
-        tk.Label(header, text="v3.0.1", font=F_SMALL,
+        tk.Label(header, text="v3.1", font=F_SMALL,
                  fg=C["text_muted"], bg=C["bg"]).pack(side="left", padx=(10, 0), pady=(8, 0))
 
         # Botão para atualização do yt-dlp local
@@ -1149,7 +1159,7 @@ class PulsarUI:
     def _get_media_duration(self, filepath):
         # Encontra o ffprobe
         app_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
-        ffprobe_exe = os.path.join(app_dir, "ffprobe.exe")
+        ffprobe_exe = os.path.join(app_dir, FFPROBE_FILENAME)
         if not os.path.exists(ffprobe_exe):
             if shutil.which("ffprobe") is not None:
                 ffprobe_exe = "ffprobe"
@@ -1168,7 +1178,7 @@ class PulsarUI:
         if shutil.which("ffmpeg") is not None:
             return "ffmpeg"
         app_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
-        local_ffmpeg = os.path.join(app_dir, "ffmpeg.exe")
+        local_ffmpeg = os.path.join(app_dir, FFMPEG_FILENAME)
         if os.path.exists(local_ffmpeg):
             return local_ffmpeg
         return None
@@ -1451,16 +1461,16 @@ class PulsarUI:
         """Executa a atualização do yt-dlp em segundo plano."""
         try:
             app_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
-            local_ytdlp = os.path.join(app_dir, "yt-dlp.exe")
+            local_ytdlp = os.path.join(app_dir, YTDLP_FILENAME)
 
             if getattr(sys, 'frozen', False):
-                # No modo compilado .exe, descarrega o yt-dlp.exe mais recente do GitHub
-                self.root.after(0, lambda: self._log("📥 A descarregar yt-dlp.exe mais recente do GitHub...", "info"))
+                # No modo compilado, descarrega o yt-dlp mais recente do GitHub
+                self.root.after(0, lambda: self._log(f"📥 A descarregar {YTDLP_FILENAME} mais recente do GitHub...", "info"))
                 self.root.after(0, lambda: self._set_status("A atualizar yt-dlp...", C["warn"]))
 
                 import urllib.request
-                url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
-                temp_path = os.path.join(app_dir, "yt-dlp_temp.exe")
+                url = f"https://github.com/yt-dlp/yt-dlp/releases/latest/download/{YTDLP_FILENAME}"
+                temp_path = os.path.join(app_dir, f"{YTDLP_FILENAME}_temp")
                 
                 req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
                 with urllib.request.urlopen(req, timeout=45) as response, open(temp_path, 'wb') as out_file:
@@ -1480,6 +1490,12 @@ class PulsarUI:
                         os.rename(local_ytdlp, local_ytdlp + ".bak")
                 
                 os.rename(temp_path, local_ytdlp)
+                
+                if os.name != 'nt':
+                    try:
+                        os.chmod(local_ytdlp, 0o755)
+                    except Exception:
+                        pass
                 
                 # Apagar ficheiro .bak se existir
                 try:
@@ -1630,9 +1646,9 @@ class PulsarUI:
         self.config.save()
 
     def _check_dependencies(self):
-        # Verificar se existe yt-dlp.exe local
+        # Verificar se existe yt-dlp local
         app_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
-        local_ytdlp = os.path.join(app_dir, "yt-dlp.exe")
+        local_ytdlp = os.path.join(app_dir, YTDLP_FILENAME)
         
         if os.path.exists(local_ytdlp):
             # Obter versão do local
@@ -1664,8 +1680,7 @@ class PulsarUI:
         if shutil.which("ffmpeg") is not None:
             return True
         app_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
-        ext = ".exe" if os.name == 'nt' else ""
-        local_ffmpeg = os.path.join(app_dir, f"ffmpeg{ext}")
+        local_ffmpeg = os.path.join(app_dir, FFMPEG_FILENAME)
         return os.path.exists(local_ffmpeg)
 
     def _download_ffmpeg(self):
@@ -1703,19 +1718,32 @@ class PulsarUI:
                 self.root.after(0, lambda: self._log("📦 A extrair ffmpeg...", "info"))
                 self.root.after(0, lambda: self._set_status("A extrair FFmpeg...", C["warn"]))
                 
-                # Extrai unicamente o executável ffmpeg do arquivo compactado
+                # Extrai unicamente o executável ffmpeg e ffprobe do arquivo compactado
                 extracted = False
-                ext = ".exe" if os.name == 'nt' else ""
+                extracted_ffprobe = False
                 with zipfile.ZipFile(temp_zip_path, 'r') as zip_ref:
                     for file_info in zip_ref.infolist():
-                        if (os.name == 'nt' and file_info.filename.endswith("bin/ffmpeg.exe")) or \
-                           (sys.platform == 'darwin' and file_info.filename == "ffmpeg"):
-                            ffmpeg_path = os.path.join(app_dir, f"ffmpeg{ext}")
+                        # Extrai ffmpeg
+                        if (os.name == 'nt' and file_info.filename.endswith(f"bin/{FFMPEG_FILENAME}")) or \
+                           (sys.platform == 'darwin' and file_info.filename == FFMPEG_FILENAME):
+                            ffmpeg_path = os.path.join(app_dir, FFMPEG_FILENAME)
                             with zip_ref.open(file_info) as source, open(ffmpeg_path, "wb") as target:
                                 shutil.copyfileobj(source, target)
                             if sys.platform == 'darwin':
                                 os.chmod(ffmpeg_path, 0o755)
                             extracted = True
+                        
+                        # Extrai ffprobe (se disponível)
+                        if (os.name == 'nt' and file_info.filename.endswith(f"bin/{FFPROBE_FILENAME}")) or \
+                           (sys.platform == 'darwin' and file_info.filename == FFPROBE_FILENAME):
+                            ffprobe_path = os.path.join(app_dir, FFPROBE_FILENAME)
+                            with zip_ref.open(file_info) as source, open(ffprobe_path, "wb") as target:
+                                shutil.copyfileobj(source, target)
+                            if sys.platform == 'darwin':
+                                os.chmod(ffprobe_path, 0o755)
+                            extracted_ffprobe = True
+
+                        if extracted and extracted_ffprobe:
                             break
                 
                 # Exclui o instalador compactado temporário da máquina
@@ -1727,8 +1755,8 @@ class PulsarUI:
                     self.root.after(0, lambda: messagebox.showinfo("FFmpeg Instalado", "O FFmpeg foi descarregado e instalado com sucesso na pasta da app! Já podes começar a descarregar vídeos/músicas."))
                     self.root.after(0, lambda: self._set_status("FFmpeg instalado com sucesso.", C["success"]))
                 else:
-                    self.root.after(0, lambda: self._log("✗ Erro: Não foi possível encontrar ffmpeg.exe dentro do ficheiro descarregado.", "err"))
-                    self.root.after(0, lambda: messagebox.showerror("Erro de Instalação", "O download foi concluído, mas o ffmpeg.exe não foi encontrado no arquivo."))
+                    self.root.after(0, lambda: self._log(f"✗ Erro: Não foi possível encontrar {FFMPEG_FILENAME} dentro do ficheiro descarregado.", "err"))
+                    self.root.after(0, lambda: messagebox.showerror("Erro de Instalação", f"O download foi concluído, mas o {FFMPEG_FILENAME} não foi encontrado no arquivo."))
                     self.root.after(0, lambda: self._set_status("Erro ao instalar FFmpeg.", C["error"]))
                     
             except Exception as e:
@@ -1762,7 +1790,7 @@ class PulsarUI:
 
         # Verifica se o yt-dlp está disponível (módulo Python ou executável local)
         app_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
-        local_ytdlp = os.path.join(app_dir, "yt-dlp.exe")
+        local_ytdlp = os.path.join(app_dir, YTDLP_FILENAME)
         if not YT_DLP_AVAILABLE and not os.path.exists(local_ytdlp):
             messagebox.showerror("Dependência em falta",
                                  "O yt-dlp não foi encontrado!\n\n"
