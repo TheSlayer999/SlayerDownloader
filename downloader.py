@@ -19,6 +19,11 @@ import time
 import argparse
 
 if sys.platform == 'darwin':
+    # MacOS GUI apps limit PATH. Inject common paths for Homebrew/MacPorts so tools like ffmpeg are found.
+    mac_paths = "/opt/homebrew/bin:/usr/local/bin"
+    if mac_paths not in os.environ.get("PATH", ""):
+        os.environ["PATH"] = f"{mac_paths}:{os.environ.get('PATH', '')}"
+
     try:
         from tkmacosx import Button as tkButton
     except ImportError:
@@ -265,14 +270,30 @@ class DownloadEngine:
         local_ytdlp = os.path.join(app_dir, YTDLP_FILENAME)
 
         if os.path.exists(local_ytdlp):
-            cmd = [local_ytdlp, "--no-warnings", "--socket-timeout", "15", "--newline"]
+            cmd = [local_ytdlp, "--socket-timeout", "15", "--newline"]
         elif getattr(sys, 'frozen', False):
-            cmd = [sys.executable, "--run-yt-dlp", "--no-warnings", "--socket-timeout", "15", "--newline"]
+            cmd = [sys.executable, "--run-yt-dlp", "--socket-timeout", "15", "--newline"]
         else:
-            cmd = [sys.executable, "-m", "yt_dlp", "--no-warnings", "--socket-timeout", "15", "--newline"]
+            cmd = [sys.executable, "-m", "yt_dlp", "--socket-timeout", "15", "--newline"]
 
         out_template = os.path.join(dest, "%(title)s.%(ext)s")
         cmd.extend(["-o", out_template])
+
+        # Anti-bloqueio: contorna erros 403 do YouTube evitando o client android_sdkless desatualizado
+        cmd.extend([
+            "--remote-components", "ejs:github",
+            "--extractor-args", "youtube:player_client=default,-android_sdkless",
+            "--downloader-args", "ffmpeg_i:-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
+            "--retries", "5",
+            "--fragment-retries", "5",
+        ])
+
+        # Deteta automaticamente o runtime JavaScript disponível para o yt-dlp
+        for rt_name, rt_bin in [("deno", "deno"), ("node", "node"), ("bun", "bun")]:
+            rt_path = shutil.which(rt_bin)
+            if rt_path:
+                cmd.extend(["--js-runtimes", f"{rt_name}:{rt_path}"])
+                break
 
         if fmt["type"] == "audio":
             cmd.extend([
@@ -284,18 +305,20 @@ class DownloadEngine:
         else:
             if fmt["quality"] == "best":
                 if fmt["ext"] == "mp4":
-                    fmt_str = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
+                    fmt_str = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best[ext=mp4]/best"
                 else:
                     fmt_str = "bestvideo+bestaudio/best"
             else:
                 if fmt["ext"] == "mp4":
                     fmt_str = (f"bestvideo[height<={fmt['quality']}][ext=mp4]+"
                                f"bestaudio[ext=m4a]/"
-                               f"best[height<={fmt['quality']}][ext=mp4]")
+                               f"bestvideo[height<={fmt['quality']}]+bestaudio/"
+                               f"best[height<={fmt['quality']}][ext=mp4]/"
+                               f"best[height<={fmt['quality']}]/best")
                 else:
                     fmt_str = (f"bestvideo[height<={fmt['quality']}]+"
                                f"bestaudio/"
-                               f"best[height<={fmt['quality']}]")
+                               f"best[height<={fmt['quality']}]/best")
             cmd.extend([
                 "-f", fmt_str,
                 "--merge-output-format", fmt["ext"],
@@ -303,6 +326,9 @@ class DownloadEngine:
             ])
 
         cmd.append(url)
+
+        # Log de diagnóstico: mostra o comando completo para depuração
+        self._on_log(f"CMD: {' '.join(cmd[:6])}...", "info")
 
         try:
             # Oculta a janela do console/terminal no ambiente Windows
@@ -345,7 +371,7 @@ class DownloadEngine:
                 self._on_status("Download concluído!", C["success"])
                 self._on_progress(100)
             else:
-                self._on_log(f"✗  Erro no download (código {return_code})", "err")
+                self._on_log(f"✗  Erro no download (código {return_code}). Vê as linhas acima para detalhes.", "err")
                 self._on_status("Erro no download", C["error"])
 
         except Exception as e:
@@ -403,6 +429,11 @@ class DownloadEngine:
                  self._on_status("A obter metadados...", C["text_dim"])
              elif "Downloading" not in line and "at" not in line and ":" in line:
                   self._on_log(line, "info")
+        # Captura warnings e erros do yt-dlp para exibição no log
+        elif line.startswith("WARNING:") or line.upper().startswith("WARNING"):
+             self._on_log(f"⚠  {line}", "warn")
+        elif line.startswith("ERROR:") or line.upper().startswith("ERROR"):
+             self._on_log(f"✗  {line}", "err")
 
 
 # --- Interface Gráfica Principal (Tkinter) ---
@@ -1436,6 +1467,8 @@ class PulsarUI:
         if os.path.isdir(path):
             if os.name == 'nt':
                 os.startfile(path)
+            elif sys.platform == 'darwin':
+                subprocess.Popen(["open", path])
             else:
                 subprocess.Popen(["xdg-open", path])
         else:
