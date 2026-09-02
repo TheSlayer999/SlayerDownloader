@@ -1,5 +1,5 @@
 """
-SlayerHub v3.1
+SlayerHub
 
 Interface gráfica (Tkinter) para download de vídeos e áudios de plataformas
 como YouTube, TikTok, Twitter e Instagram. Suporta downloads individuais
@@ -40,6 +40,9 @@ else:
 
 FFMPEG_FILENAME = "ffmpeg.exe" if os.name == 'nt' else "ffmpeg"
 FFPROBE_FILENAME = "ffprobe.exe" if os.name == 'nt' else "ffprobe"
+
+# Versão da aplicação (fonte única — usada no título da janela e no cabeçalho)
+VERSION = "3.1"
 
 # Suporte a notificações sonoras nativas do Windows
 try:
@@ -119,8 +122,13 @@ FORMAT_OPTIONS = {
     "⭐  Vídeo Melhor Qualidade":  {"type": "video", "ext": "mp4",  "quality": "best"},
 }
 
+def _app_dir():
+    """Diretório real da aplicação (junto ao exe quando compilado, senão o do script)."""
+    return os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+
+
 # Caminho para o arquivo de configuração local do usuário
-CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+CONFIG_PATH = os.path.join(_app_dir(), "config.json")
 
 
 # --- Gerenciador de Configurações ---
@@ -266,7 +274,7 @@ class DownloadEngine:
         self._last_activity_time = time.time()
 
         # Determina o caminho do executável do yt-dlp conforme o ambiente
-        app_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+        app_dir = _app_dir()
         local_ytdlp = os.path.join(app_dir, YTDLP_FILENAME)
 
         if os.path.exists(local_ytdlp):
@@ -335,7 +343,7 @@ class DownloadEngine:
             creationflags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
 
             # Inclui o diretório local no PATH para que o yt-dlp localize o FFmpeg
-            app_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+            app_dir = _app_dir()
             env = os.environ.copy()
             env["PATH"] = app_dir + os.pathsep + env.get("PATH", "")
 
@@ -391,8 +399,7 @@ class DownloadEngine:
             if pattern in line_lower:
                 self._on_log(f"✗  {message}", "err")
                 self._on_status(message, C["error"])
-                return True
-        return False
+                return
 
     def _parse_output(self, line):
         """Processa a saída em tempo real do yt-dlp para atualizar o progresso na UI."""
@@ -421,7 +428,7 @@ class DownloadEngine:
              self._on_phase("merging")
              self._on_status("A juntar vídeo e áudio...", C["warn"])
              self._on_log("A juntar ficheiros com ffmpeg...", "info")
-        elif "[ExtractAudio]" in line or "Destination:" in line and "audio" in line.lower():
+        elif "[ExtractAudio]" in line or ("Destination:" in line and "audio" in line.lower()):
              self._on_phase("merging")
              self._on_status("Processando media (FFmpeg)...", C["warn"])
         elif line.startswith("[youtube]") or line.startswith("[info]"):
@@ -440,7 +447,7 @@ class DownloadEngine:
 class PulsarUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("SlayerHub v3.1")
+        self.root.title(f"SlayerHub v{VERSION}")
         self.root.geometry("800x800")
         # Removed fixed minsize; will set dynamically after UI is built
         # self.root.minsize(800, 800)
@@ -529,7 +536,7 @@ class PulsarUI:
                  fg=C["accent"], bg=C["bg"]).pack(side="left")
         tk.Label(header, text="HUB", font=("Calibri", 22),
                  fg=C["text_dim"], bg=C["bg"]).pack(side="left", padx=(6, 0))
-        tk.Label(header, text="v3.1", font=F_SMALL,
+        tk.Label(header, text=f"v{VERSION}", font=F_SMALL,
                  fg=C["text_muted"], bg=C["bg"]).pack(side="left", padx=(10, 0), pady=(8, 0))
 
         # Botão para atualização do yt-dlp local
@@ -1000,6 +1007,22 @@ class PulsarUI:
         output_dir = self.download_path.get()
         os.makedirs(output_dir, exist_ok=True)
 
+        # Deteta ficheiros de destino já existentes e pergunta uma vez (na thread principal)
+        existing = []
+        for input_path in files:
+            basename = os.path.basename(input_path)
+            name_without_ext = os.path.splitext(basename)[0]
+            output_path = os.path.join(output_dir, f"{name_without_ext}.{target_fmt.lower()}")
+            if os.path.exists(output_path):
+                existing.append(output_path)
+        if existing:
+            preview = "\n".join(existing[:5]) + ("\n..." if len(existing) > 5 else "")
+            if not messagebox.askyesno(
+                "Substituir ficheiro(s)?",
+                f"{len(existing)} ficheiro(s) já existem:\n\n{preview}\n\nPretendes substituir?"
+            ):
+                return
+
         # Start batch conversion in a thread
         self.is_converting = True
         self.conv_btn.config(text="■  CANCELAR", bg=C["error"])
@@ -1014,19 +1037,20 @@ class PulsarUI:
         self.conv_thread.start()
 
     def _run_batch_conversion(self, files, target_fmt):
+        success = True
         for input_path in files:
+            if not self.is_converting:
+                break  # Cancelado pelo utilizador
             basename = os.path.basename(input_path)
             name_without_ext = os.path.splitext(basename)[0]
             output_ext = target_fmt.lower()
             output_path = os.path.join(self.download_path.get(), f"{name_without_ext}.{output_ext}")
-            # Check replace prompt for each file
-            if os.path.exists(output_path):
-                if not messagebox.askyesno("Substituir ficheiro?", f"O ficheiro já existe:\n{output_path}\n\nPretendes substituir?"):
-                    continue
             # Run conversion for this file
-            self._run_conversion(input_path, output_path, target_fmt)
-        # After batch completed, reset UI state
-        self.root.after(0, lambda: self._on_conversion_done(success=True, cancelled=False))
+            if not self._run_conversion(input_path, output_path, target_fmt):
+                success = False
+        # Após o lote terminar, repõe o estado da UI uma única vez (se não foi cancelado)
+        if self.is_converting:
+            self._safe_done_conversion(success=success)
 
     def _run_conversion(self, input_path, output_path, target_fmt):
         ext = os.path.splitext(input_path)[1].lower()
@@ -1060,19 +1084,18 @@ class PulsarUI:
                 self._safe_log(f"✓ Conversão de imagem concluída: {os.path.basename(output_path)}", "ok")
                 self._safe_status("Conversão concluída!", C["success"])
                 self._safe_progress(100)
-                self._safe_done_conversion(success=True)
+                return True
             except Exception as e:
                 self._safe_log(f"✗ Erro na conversão de imagem: {str(e)}", "err")
                 self._safe_status("Erro na conversão", C["error"])
-                self._safe_done_conversion(success=False)
+                return False
         else:
             # Conversão de áudio/vídeo (FFmpeg)
             ffmpeg_path = self._get_ffmpeg_path()
             if not ffmpeg_path:
                 self._safe_log("✗ Erro: FFmpeg não encontrado! Impossível converter áudio/vídeo.", "err")
                 self._safe_status("FFmpeg em falta", C["error"])
-                self._safe_done_conversion(success=False)
-                return
+                return False
                 
             # Verifica duração para a barra de progresso
             total_duration = self._get_media_duration(input_path)
@@ -1144,16 +1167,16 @@ class PulsarUI:
                     self._safe_log(f"✓ Conversão concluída: {os.path.basename(output_path)}", "ok")
                     self._safe_status("Conversão concluída!", C["success"])
                     self._safe_progress(100)
-                    self._safe_done_conversion(success=True)
+                    return True
                 else:
                     if self.is_converting: # se não foi cancelado
                         self._safe_log(f"✗ Erro no FFmpeg (código {return_code})", "err")
                         self._safe_status("Erro na conversão", C["error"])
-                        self._safe_done_conversion(success=False)
+                    return False
             except Exception as e:
                 self._safe_log(f"✗ Erro inesperado no subprocesso do FFmpeg: {str(e)}", "err")
                 self._safe_status("Erro inesperado", C["error"])
-                self._safe_done_conversion(success=False)
+                return False
 
     def _cancel_conversion(self):
         self._log("⊘ Conversão cancelada pelo utilizador.", "warn")
@@ -1189,7 +1212,7 @@ class PulsarUI:
 
     def _get_media_duration(self, filepath):
         # Encontra o ffprobe
-        app_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+        app_dir = _app_dir()
         ffprobe_exe = os.path.join(app_dir, FFPROBE_FILENAME)
         if not os.path.exists(ffprobe_exe):
             if shutil.which("ffprobe") is not None:
@@ -1208,7 +1231,7 @@ class PulsarUI:
     def _get_ffmpeg_path(self):
         if shutil.which("ffmpeg") is not None:
             return "ffmpeg"
-        app_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+        app_dir = _app_dir()
         local_ffmpeg = os.path.join(app_dir, FFMPEG_FILENAME)
         if os.path.exists(local_ffmpeg):
             return local_ffmpeg
@@ -1326,10 +1349,6 @@ class PulsarUI:
         except (tk.TclError, Exception):
             pass  # Ignora erros de clipboard vazio ou sem permissão de leitura
 
-    def _reset_auto_paste(self, *_):
-        """Reseta a flag de colagem automática ao detectar alteração manual no URL."""
-        self._auto_pasted = False
-
     # --- Colagem Manual do Clipboard ---
     def _paste_from_clipboard(self):
         """Copia o conteúdo textual da área de transferência para o campo de link."""
@@ -1365,6 +1384,8 @@ class PulsarUI:
         current_job = self._thumbnail_job
 
         if not url or not url.startswith(("http://", "https://")):
+            if not url:
+                self._auto_pasted = False  # Campo limpo — permite nova colagem automática
             self._hide_thumbnail()
             return
 
@@ -1493,7 +1514,7 @@ class PulsarUI:
     def _run_update_ytdlp(self):
         """Executa a atualização do yt-dlp em segundo plano."""
         try:
-            app_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+            app_dir = _app_dir()
             local_ytdlp = os.path.join(app_dir, YTDLP_FILENAME)
 
             if getattr(sys, 'frozen', False):
@@ -1680,7 +1701,7 @@ class PulsarUI:
 
     def _check_dependencies(self):
         # Verificar se existe yt-dlp local
-        app_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+        app_dir = _app_dir()
         local_ytdlp = os.path.join(app_dir, YTDLP_FILENAME)
         
         if os.path.exists(local_ytdlp):
@@ -1712,7 +1733,7 @@ class PulsarUI:
         """Verifica a presença da dependência FFmpeg no PATH ou localmente."""
         if shutil.which("ffmpeg") is not None:
             return True
-        app_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+        app_dir = _app_dir()
         local_ffmpeg = os.path.join(app_dir, FFMPEG_FILENAME)
         return os.path.exists(local_ffmpeg)
 
@@ -1729,7 +1750,7 @@ class PulsarUI:
                 import urllib.request
                 import zipfile
                 
-                app_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+                app_dir = _app_dir()
                 
                 if os.name == 'nt':
                     url = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
@@ -1822,7 +1843,7 @@ class PulsarUI:
             return
 
         # Verifica se o yt-dlp está disponível (módulo Python ou executável local)
-        app_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+        app_dir = _app_dir()
         local_ytdlp = os.path.join(app_dir, YTDLP_FILENAME)
         if not YT_DLP_AVAILABLE and not os.path.exists(local_ytdlp):
             messagebox.showerror("Dependência em falta",
